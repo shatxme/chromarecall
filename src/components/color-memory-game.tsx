@@ -6,8 +6,19 @@ import { Progress } from "@/components/ui/progress"
 import { toast } from "@/components/ui/use-toast"
 import ColorSwatch from "../components/color-swatch"
 import ScoreDisplay from "./score-display"
-import { generateColors, calculateColorDifference, calculateTimeForLevel } from "../lib/color-utils"
+import { generateColors, calculateColorDifference } from "../lib/color-utils"
 import type { GameState } from "../types"
+
+const MAX_LEVEL = 100 // Changed from 10 to 100
+
+function calculateDifficulty(level: number) {
+  const progress = (level - 1) / (MAX_LEVEL - 1) // 0 to 1
+  const colorCount = Math.min(10, 3 + Math.floor((level - 1) / 10)) // 3 to 10 colors, incrementing every 10 levels
+  const similarity = 0.3 + (progress * 0.65) // 0.3 to 0.95
+  const viewTime = Math.max(1, Math.round(5 - progress * 3)) // 5 to 2 seconds
+  const selectionTime = Math.max(5, Math.round(15 - progress * 9)) // 15 to 6 seconds
+  return { colorCount, similarity, viewTime, selectionTime }
+}
 
 export function ColorMemoryGame() {
   const [gameState, setGameState] = useState<GameState>({
@@ -15,7 +26,7 @@ export function ColorMemoryGame() {
     options: [],
     score: 0,
     level: 1,
-    timeLeft: 5,
+    timeLeft: 2,
     isPlaying: false,
     highScore: 0
   })
@@ -25,27 +36,34 @@ export function ColorMemoryGame() {
   useEffect(() => {
     let timer: NodeJS.Timeout
     if (gameState.isPlaying && gameState.timeLeft > 0) {
-      timer = setTimeout(() => setGameState(prev => ({ ...prev, timeLeft: prev.timeLeft - 1 })), 1000)
+      timer = setInterval(() => {
+        setGameState(prev => ({
+          ...prev,
+          timeLeft: Math.max(0, prev.timeLeft - 1)
+        }));
+      }, 1000);
     } else if (gameState.isPlaying && gameState.timeLeft === 0) {
       if (showTarget) {
         setShowTarget(false)
-        setGameState(prev => ({ ...prev, timeLeft: calculateTimeForLevel(prev.level) }))
+        const { selectionTime } = calculateDifficulty(gameState.level)
+        setGameState(prev => ({ ...prev, timeLeft: selectionTime }))
       } else {
         endGame()
       }
     }
-    return () => clearTimeout(timer)
-  }, [gameState.isPlaying, gameState.timeLeft, showTarget])
+    return () => clearInterval(timer)
+  }, [gameState.isPlaying, gameState.timeLeft, showTarget, gameState.level]) // Added gameState.level to the dependency array
 
   function startGame() {
     setIsLoading(true)
-    const { target, options } = generateColors(1)
+    const { colorCount, similarity, viewTime } = calculateDifficulty(1)
+    const { target, options } = generateColors(colorCount, similarity)
     setGameState(prev => ({
       ...prev,
       isPlaying: true,
       score: 0,
       level: 1,
-      timeLeft: 5,
+      timeLeft: viewTime,
       targetColor: target,
       options: options
     }))
@@ -70,18 +88,18 @@ export function ColorMemoryGame() {
     const difference = calculateColorDifference(gameState.targetColor, selectedColor)
     const points = Math.max(0, 100 - Math.round(difference * 1000))
     
-    setGameState(prev => {
-      const newLevel = prev.level + 1
-      const { target, options } = generateColors(newLevel)
-      return {
-        ...prev,
-        score: prev.score + points,
-        level: newLevel,
-        timeLeft: 5,
-        targetColor: target,
-        options: options
-      }
-    })
+    const newLevel = gameState.level + 1
+    const { colorCount, similarity, viewTime } = calculateDifficulty(newLevel)
+    const { target, options } = generateColors(colorCount, similarity)
+    
+    setGameState(prev => ({
+      ...prev,
+      score: prev.score + points,
+      level: newLevel,
+      timeLeft: viewTime,
+      targetColor: target,
+      options: options
+    }))
     
     setShowTarget(true)
     
@@ -90,7 +108,7 @@ export function ColorMemoryGame() {
       description: `You earned ${points} points!`,
     })
 
-    if (gameState.level >= 100) {
+    if (newLevel > MAX_LEVEL) {
       endGame()
     }
   }
@@ -128,10 +146,15 @@ export function ColorMemoryGame() {
                 </div>
               )}
             </div>
-            <Progress 
-              value={(gameState.timeLeft / calculateTimeForLevel(gameState.level)) * 100} 
-              className="h-4" 
-            />
+            <div className="flex items-center justify-between mb-2">
+              <Progress 
+                value={(gameState.timeLeft / calculateDifficulty(gameState.level)[showTarget ? 'viewTime' : 'selectionTime']) * 100} 
+                className="h-4 flex-grow mr-2" 
+              />
+              <span className="text-lg font-semibold">
+                {gameState.timeLeft}s
+              </span>
+            </div>
           </>
         )}
       </div>

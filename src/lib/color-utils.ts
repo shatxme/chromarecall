@@ -93,22 +93,38 @@ function generateRandomColor(): string {
   return `#${Math.floor(Math.random()*16777215).toString(16).padStart(6, '0')}`;
 }
 
-export function generateColors(level: number): { target: string, options: string[] } {
+export function generateColors(colorCount: number, similarity: number): { target: string, options: string[] } {
   const target = generateRandomColor();
   const options = [target];
   
-  // Difficulty increases with level, starting very easy and becoming very hard over 100 levels
-  const difficulty = Math.max(0.1, Math.min(0.5, 0.1 + (level - 1) * 0.004));
+  const colorDifferenceThreshold = 1 - similarity;
+  const maxAttempts = 1000; // Prevent infinite loop
   
-  for (let i = 0; i < 5; i++) {
-    let option = generateRandomColor();
-    while (calculateColorDifference(target, option) < difficulty) {
-      option = generateRandomColor();
-    }
+  for (let i = 1; i < colorCount; i++) {
+    let option;
+    let attempts = 0;
+    do {
+      option = generateSimilarColor(target, similarity);
+      attempts++;
+    } while (calculateColorDifference(target, option) > colorDifferenceThreshold && attempts < maxAttempts);
+    
     options.push(option);
   }
   
   return { target, options: shuffleArray(options) };
+}
+
+function generateSimilarColor(baseColor: string, similarity: number): string {
+  const [h, s, l] = hex2hsl(baseColor);
+  const hueRange = 360 * (1 - similarity);
+  const saturationRange = 100 * (1 - similarity);
+  const lightnessRange = 50 * (1 - similarity);
+
+  const newHue = (h + (Math.random() * 2 - 1) * hueRange + 360) % 360;
+  const newSaturation = Math.max(0, Math.min(100, s + (Math.random() * 2 - 1) * saturationRange));
+  const newLightness = Math.max(0, Math.min(100, l + (Math.random() * 2 - 1) * lightnessRange));
+
+  return hslToHex(newHue, newSaturation, newLightness);
 }
 
 export function calculateColorDifference(color1: string, color2: string): number {
