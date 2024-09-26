@@ -43,7 +43,7 @@ export const authOptions: NextAuthOptions = {
       console.log('Token:', token)
       console.log('User:', user)
       if (session?.user) {
-        session.user.id = token.sub || user?.id || undefined
+        session.user.id = token?.sub || user?.id || undefined
       }
       return session
     },
