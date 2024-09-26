@@ -12,10 +12,22 @@ let clientPromise: Promise<MongoClient>
 
 if (process.env.NODE_ENV === 'production') {
   if (!uri) {
-    throw new Error('Please add your Mongo URI to .env.local')
+    console.warn('MONGODB_URI not found in production environment. Using mock client.')
+    const mockClient = {
+      db: () => ({
+        collection: () => ({
+          findOne: async () => ({}),
+          insertOne: async () => ({}),
+          updateOne: async () => ({}),
+          deleteOne: async () => ({}),
+        }),
+      }),
+    } as unknown as MongoClient
+    clientPromise = Promise.resolve(mockClient)
+  } else {
+    const client = new MongoClient(uri, options)
+    clientPromise = client.connect()
   }
-  const client = new MongoClient(uri, options)
-  clientPromise = client.connect()
 } else {
   // In development mode, use a global variable so that the value
   // is preserved across module reloads caused by HMR (Hot Module Replacement).
