@@ -24,7 +24,7 @@ export default function SignIn({ providers }: { providers: Record<string, Provid
   return <div>Signing in...</div>
 }
 
-export const getServerSideProps: GetServerSideProps = async (context) => {
+export const getServerSideProps: GetServerSideProps = async () => {
   const providers = await getProviders()
   return {
     props: { providers },
