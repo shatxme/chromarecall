@@ -69,14 +69,15 @@ function GameComponent() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             userId: session.user.id,
-            username: session.user.name,
+            username: session.user.name || 'Anonymous',
             score: gameState.score,
             level: gameState.level,
           }),
         })
 
         if (!response.ok) {
-          throw new Error('Failed to save score')
+          const errorData = await response.json()
+          throw new Error(errorData.message || 'Failed to save score')
         }
 
         const result = await response.json()

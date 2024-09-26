@@ -9,15 +9,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const db = client.db("colormemorygame");
 
     if (req.method === 'GET') {
-      if (!db) {
-        throw new Error('Database connection not established');
-      }
-
       const collection = db.collection("scores");
-      if (!collection) {
-        throw new Error('Scores collection not found');
-      }
-
       const leaderboard = await collection
         .find({})
         .sort({ score: -1 })
@@ -28,15 +20,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     } else if (req.method === 'POST') {
       const { userId, username, score, level } = req.body;
 
-      if (!db) {
-        throw new Error('Database connection not established');
-      }
-
       const collection = db.collection("scores");
-      if (!collection) {
-        throw new Error('Scores collection not found');
-      }
-
       const result = await collection.insertOne({
         userId,
         username,
