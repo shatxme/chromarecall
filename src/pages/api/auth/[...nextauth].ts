@@ -40,7 +40,7 @@ export const authOptions: NextAuthOptions = {
     async session({ session, token, user }) {
       console.log('Session callback:', { session, token, user })
       if (session?.user) {
-        session.user.id = token.sub || user?.id
+        session.user.id = token.sub || user?.id || undefined
       }
       return session
     },
