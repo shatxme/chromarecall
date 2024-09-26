@@ -56,7 +56,7 @@ function GameComponent() {
       if (newHighScore > prev.highScore) {
         toast({
           title: "New High Score!",
-          description: "Congratulations! You've set a new high score of " + newHighScore + " points!",
+          description: `Congratulations! You've set a new high score of ${newHighScore} points!`,
         })
       }
       return { ...prev, isPlaying: false, highScore: newHighScore }
@@ -64,7 +64,7 @@ function GameComponent() {
 
     if (session?.user) {
       try {
-        const response = await fetch('/api/save-score', {
+        const response = await fetch('/api/leaderboard', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

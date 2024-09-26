@@ -9,40 +9,38 @@ type LeaderboardEntry = {
   level: number
 }
 
-const mockLeaderboard: LeaderboardEntry[] = [
-  { username: "Player1", score: 1000, level: 10 },
-  { username: "Player2", score: 900, level: 9 },
-  { username: "Player3", score: 800, level: 8 },
-  { username: "Player4", score: 700, level: 7 },
-  { username: "Player5", score: 600, level: 6 },
-]
-
 export function Leaderboard() {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     const fetchLeaderboard = async () => {
-      if (process.env.NODE_ENV === 'development') {
-        // Use mock data in development
-        setLeaderboard(mockLeaderboard)
-      } else {
-        try {
-          const response = await fetch('/api/leaderboard')
-          if (!response.ok) {
-            throw new Error('Failed to fetch leaderboard')
-          }
-          const data = await response.json()
-          setLeaderboard(data)
-        } catch (error) {
-          console.error('Error fetching leaderboard:', error)
-          // Fallback to mock data if there's an error
-          setLeaderboard(mockLeaderboard)
+      try {
+        const response = await fetch('/api/leaderboard')
+        if (!response.ok) {
+          throw new Error('Failed to fetch leaderboard')
         }
+        const data = await response.json()
+        setLeaderboard(data)
+      } catch (error) {
+        console.error('Error fetching leaderboard:', error)
+        setError('Failed to load leaderboard. Please try again later.')
+      } finally {
+        setIsLoading(false)
       }
     }
 
     fetchLeaderboard()
   }, [])
+
+  if (isLoading) {
+    return <div>Loading leaderboard...</div>
+  }
+
+  if (error) {
+    return <div>{error}</div>
+  }
 
   return (
     <Table>
