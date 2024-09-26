@@ -25,24 +25,12 @@ if (!uri) {
   console.warn('MONGODB_URI not found. Using mock client.')
   clientPromise = Promise.resolve(mockClient)
 } else {
-  if (process.env.NODE_ENV === 'development') {
-    if (!global._mongoClientPromise) {
-      const client = new MongoClient(uri, options)
-      global._mongoClientPromise = client.connect()
-        .catch(err => {
-          console.error('Failed to connect to MongoDB:', err)
-          return mockClient
-        })
-    }
-    clientPromise = global._mongoClientPromise
-  } else {
-    const client = new MongoClient(uri, options)
-    clientPromise = client.connect()
-      .catch(err => {
-        console.error('Failed to connect to MongoDB:', err)
-        return mockClient
-      })
-  }
+  const client = new MongoClient(uri, options)
+  clientPromise = client.connect()
+    .catch(err => {
+      console.error('Failed to connect to MongoDB:', err)
+      return mockClient
+    })
 }
 
 export default clientPromise

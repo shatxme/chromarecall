@@ -10,12 +10,8 @@ if (!googleId || !googleSecret) {
   console.warn('Missing Google OAuth credentials. Some functionality may be limited.')
 }
 
-const useSecureProps = process.env.NODE_ENV === 'production'
-
 export const authOptions: NextAuthOptions = {
-  adapter: useSecureProps 
-    ? MongoDBAdapter(clientPromise)
-    : undefined,
+  adapter: MongoDBAdapter(clientPromise),
   providers: [
     GoogleProvider({
       clientId: googleId ?? 'dummy-client-id',
@@ -39,13 +35,13 @@ export const authOptions: NextAuthOptions = {
     },
     session: async ({ session, token, user }) => {
       if (session?.user) {
-        session.user.id = token.sub || user.id
+        session.user.id = token.sub || user?.id
       }
       return session
     },
   },
   session: {
-    strategy: useSecureProps ? "database" : "jwt",
+    strategy: "jwt",
   },
   pages: {
     signIn: '/auth/signin',
