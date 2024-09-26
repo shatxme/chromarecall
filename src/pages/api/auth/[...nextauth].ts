@@ -20,7 +20,8 @@ export const authOptions: NextAuthOptions = {
         params: {
           prompt: "select_account",
           access_type: "offline",
-          response_type: "code"
+          response_type: "code",
+          scope: 'https://www.googleapis.com/auth/userinfo.email openid https://www.googleapis.com/auth/userinfo.profile'
         }
       }
     }),
