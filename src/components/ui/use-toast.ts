@@ -1,12 +1,12 @@
-// This is a placeholder for the toast functionality
-// You may want to implement a proper toast system later
+import { toast as sonnerToast, ToastT } from 'sonner'
 
-interface ToastOptions {
-  title: string;
-  description: string;
+type ToastOptions = Partial<ToastT> & {
+  variant?: 'default' | 'destructive'
 }
 
-export const toast = (options: ToastOptions) => {
-  console.log(`Toast Title: ${options.title}`);
-  console.log(`Toast Description: ${options.description}`);
-};
+export const toast = ({ variant, ...props }: ToastOptions) => {
+  sonnerToast(props.title || '', {
+    ...props,
+    className: variant === 'destructive' ? 'bg-destructive text-destructive-foreground' : undefined
+  })
+}
