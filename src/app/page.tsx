@@ -4,7 +4,13 @@ import { authOptions } from '@/pages/api/auth/[...nextauth]'
 import { SignInButton } from '@/components/SignInButton'
 
 export default async function Home() {
-  const session = await getServerSession(authOptions)
+  let session
+  try {
+    session = await getServerSession(authOptions)
+  } catch (error) {
+    console.error('Failed to get server session:', error)
+    // Proceed without a session
+  }
 
   if (session) {
     return <ColorMemoryGame />

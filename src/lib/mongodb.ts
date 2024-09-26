@@ -10,43 +10,31 @@ const options: MongoClientOptions = {}
 
 let clientPromise: Promise<MongoClient>
 
-if (process.env.NODE_ENV === 'production') {
-  if (!uri) {
-    console.warn('MONGODB_URI not found in production environment. Using mock client.')
-    const mockClient = {
-      db: () => ({
-        collection: () => ({
-          findOne: async () => ({}),
-          insertOne: async () => ({}),
-          updateOne: async () => ({}),
-          deleteOne: async () => ({}),
-        }),
-      }),
-    } as unknown as MongoClient
-    clientPromise = Promise.resolve(mockClient)
+const mockClient = {
+  db: () => ({
+    collection: () => ({
+      findOne: async () => ({}),
+      insertOne: async () => ({}),
+      updateOne: async () => ({}),
+      deleteOne: async () => ({}),
+    }),
+  }),
+} as unknown as MongoClient
+
+if (!uri) {
+  console.warn('MONGODB_URI not found. Using mock client.')
+  clientPromise = Promise.resolve(mockClient)
+} else {
+  if (process.env.NODE_ENV === 'development') {
+    if (!global._mongoClientPromise) {
+      const client = new MongoClient(uri, options)
+      global._mongoClientPromise = client.connect()
+    }
+    clientPromise = global._mongoClientPromise
   } else {
     const client = new MongoClient(uri, options)
     clientPromise = client.connect()
   }
-} else {
-  // In development mode, use a global variable so that the value
-  // is preserved across module reloads caused by HMR (Hot Module Replacement).
-  if (!global._mongoClientPromise) {
-    const mockClient = {
-      db: () => ({
-        collection: () => ({
-          findOne: async () => ({}),
-          insertOne: async () => ({}),
-          updateOne: async () => ({}),
-          deleteOne: async () => ({}),
-        }),
-      }),
-    } as unknown as MongoClient
-    global._mongoClientPromise = Promise.resolve(mockClient)
-  }
-  clientPromise = global._mongoClientPromise
 }
 
-// Export a module-scoped MongoClient promise. By doing this in a
-// separate module, the client can be shared across functions.
 export default clientPromise
