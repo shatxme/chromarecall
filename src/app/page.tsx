@@ -3,6 +3,8 @@ import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/pages/api/auth/[...nextauth]'
 import { SignInButton } from '@/components/SignInButton'
 
+export const dynamic = 'force-dynamic'
+
 export default async function Home() {
   let session
   try {
