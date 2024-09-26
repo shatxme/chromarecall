@@ -27,13 +27,16 @@ export const authOptions: NextAuthOptions = {
   ],
   secret: process.env.NEXTAUTH_SECRET,
   callbacks: {
-    async signIn() {
+    async signIn({ user, account, profile, email, credentials }) {
+      console.log('Sign in callback:', { user, account, profile, email, credentials })
       return true
     },
     async redirect({ url, baseUrl }) {
+      console.log('Redirect callback:', { url, baseUrl })
       return url.startsWith(baseUrl) ? url : baseUrl
     },
     session: async ({ session, token, user }) => {
+      console.log('Session callback:', { session, token, user })
       if (session?.user) {
         session.user.id = token.sub || user?.id
       }
@@ -47,7 +50,7 @@ export const authOptions: NextAuthOptions = {
     signIn: '/auth/signin',
     error: '/auth/error',
   },
-  debug: process.env.NODE_ENV === 'development',
+  debug: true, // Enable debug mode
 }
 
 export default NextAuth(authOptions)
