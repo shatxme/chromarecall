@@ -19,13 +19,14 @@ export function Leaderboard() {
       try {
         const response = await fetch('/api/leaderboard')
         if (!response.ok) {
-          throw new Error('Failed to fetch leaderboard')
+          const errorData = await response.json()
+          throw new Error(errorData.message || 'Failed to fetch leaderboard')
         }
         const data = await response.json()
         setLeaderboard(data)
-      } catch (error) {
+      } catch (error: unknown) {
         console.error('Error fetching leaderboard:', error)
-        setError('Failed to load leaderboard. Please try again later.')
+        setError(error instanceof Error ? error.message : 'An unknown error occurred')
       } finally {
         setIsLoading(false)
       }
@@ -39,7 +40,7 @@ export function Leaderboard() {
   }
 
   if (error) {
-    return <div>{error}</div>
+    return <div>Error: {error}</div>
   }
 
   return (
