@@ -20,7 +20,7 @@ export const authOptions: NextAuthOptions = {
       clientSecret: googleSecret ?? 'dummy-client-secret',
       authorization: {
         params: {
-          prompt: "consent",
+          prompt: "select_account",
           access_type: "offline",
           response_type: "code"
         }
@@ -29,6 +29,12 @@ export const authOptions: NextAuthOptions = {
   ],
   secret: process.env.NEXTAUTH_SECRET,
   callbacks: {
+    async signIn({ user, account, profile, email, credentials }) {
+      return true
+    },
+    async redirect({ url, baseUrl }) {
+      return url.startsWith(baseUrl) ? url : baseUrl
+    },
     session: async ({ session, token, user }) => {
       if (session?.user) {
         session.user.id = token.sub || user.id
@@ -43,6 +49,7 @@ export const authOptions: NextAuthOptions = {
     signIn: '/auth/signin',
     error: '/auth/error',
   },
+  debug: process.env.NODE_ENV === 'development',
 }
 
 export default NextAuth(authOptions)
