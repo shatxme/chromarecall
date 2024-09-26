@@ -33,24 +33,37 @@ export const authOptions: NextAuthOptions = {
     },
     async redirect({ url, baseUrl }) {
       console.log('Redirect callback:', { url, baseUrl })
-      return url.startsWith(baseUrl) ? url : baseUrl
+      if (url.startsWith(baseUrl)) return url
+      else if (url.startsWith('/')) return new URL(url, baseUrl).toString()
+      return baseUrl
     },
-    session: async ({ session, token, user }) => {
+    async session({ session, token, user }) {
       console.log('Session callback:', { session, token, user })
       if (session?.user) {
         session.user.id = token.sub || user?.id
       }
       return session
     },
+    async jwt({ token, user, account, profile }) {
+      console.log('JWT callback:', { token, user, account, profile })
+      if (user) {
+        token.id = user.id
+      }
+      return token
+    },
   },
-  session: {
-    strategy: "jwt",
+  events: {
+    async signIn(message) { console.log('signIn event:', message) },
+    async signOut(message) { console.log('signOut event:', message) },
+    async createUser(message) { console.log('createUser event:', message) },
+    async linkAccount(message) { console.log('linkAccount event:', message) },
+    async session(message) { console.log('session event:', message) },
   },
   pages: {
     signIn: '/auth/signin',
     error: '/auth/error',
   },
-  debug: true, // Enable debug mode
+  debug: true,
 }
 
 export default NextAuth(authOptions)
