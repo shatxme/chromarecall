@@ -18,19 +18,24 @@ const mockAdapter: Adapter = {
   createUser: async (user: Omit<AdapterUser, "id">) => ({ ...user, id: 'mock-user-id', emailVerified: null }) as AdapterUser,
   getUser: async (id: string) => ({ id, name: 'Mock User', email: 'mock@example.com', emailVerified: null }) as AdapterUser,
   getUserByEmail: async (email: string) => ({ id: 'mock-user-id', name: 'Mock User', email, emailVerified: null }) as AdapterUser,
-  getUserByAccount: async ({ providerAccountId, provider }: { providerAccountId: string, provider: string }) => 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  getUserByAccount: async ({ providerAccountId: _providerAccountId, provider: _provider }: { providerAccountId: string, provider: string }) => 
     ({ id: 'mock-user-id', name: 'Mock User', email: 'mock@example.com', emailVerified: null }) as AdapterUser,
   updateUser: async (user: Partial<AdapterUser>) => ({ ...user, id: 'mock-user-id', emailVerified: user.emailVerified || null }) as AdapterUser,
-  deleteUser: async (userId: string) => {},
-  linkAccount: async (account: any) => {},
-  unlinkAccount: async ({ providerAccountId, provider }: { providerAccountId: string, provider: string }) => {},
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  deleteUser: async (_userId: string) => { /* Implementation not needed for mock */ },
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  linkAccount: async (_account: unknown) => { /* Implementation not needed for mock */ },
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  unlinkAccount: async ({ providerAccountId: _providerAccountId, provider: _provider }: { providerAccountId: string, provider: string }) => { /* Implementation not needed for mock */ },
   createSession: async (session: { sessionToken: string; userId: string; expires: Date }) => session as AdapterSession,
   getSessionAndUser: async (sessionToken: string) => ({ 
     session: { sessionToken, userId: 'mock-user-id', expires: new Date() } as AdapterSession,
     user: { id: 'mock-user-id', name: 'Mock User', email: 'mock@example.com', emailVerified: null } as AdapterUser
   }),
   updateSession: async (session: Partial<AdapterSession>) => session as AdapterSession,
-  deleteSession: async (sessionToken: string) => {},
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  deleteSession: async (_sessionToken: string) => { /* Implementation not needed for mock */ },
   createVerificationToken: async (token: VerificationToken) => token,
   useVerificationToken: async ({ identifier, token }: { identifier: string, token: string }) => 
     ({ identifier, token, expires: new Date() }) as VerificationToken,
@@ -60,16 +65,12 @@ export const authOptions: NextAuthOptions = {
     },
     async redirect({ url, baseUrl }) {
       console.log('Redirect callback:', { url, baseUrl })
-      if (url.startsWith(baseUrl)) return url
-      else if (url.startsWith('/')) return new URL(url, baseUrl).toString()
-      return baseUrl
+      return url.startsWith(baseUrl) ? url : baseUrl
     },
     async session({ session, token, user }) {
       console.log('Session callback:', { session, token, user })
-      console.log('Token:', token)
-      console.log('User:', user)
       if (session?.user) {
-        session.user.id = token?.sub || user?.id || undefined
+        session.user.id = token?.sub || user?.id || 'unknown'
       }
       return session
     },
@@ -89,8 +90,7 @@ export const authOptions: NextAuthOptions = {
     async session(message) { console.log('session event:', message) },
   },
   pages: {
-    signIn: '/auth/signin',
-    error: '/auth/error',
+    error: '/auth/error', // Keep this for error handling
   },
   debug: true,
 }
