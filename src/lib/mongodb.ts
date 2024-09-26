@@ -5,7 +5,9 @@ if (!process.env.MONGODB_URI) {
 }
 
 const uri = process.env.MONGODB_URI
-const options: MongoClientOptions = {}
+const options: MongoClientOptions = {
+  serverSelectionTimeoutMS: 5000, // Reduce the server selection timeout
+}
 
 let client: MongoClient
 let clientPromise: Promise<MongoClient>
@@ -20,12 +22,20 @@ if (process.env.NODE_ENV === 'development') {
   if (!globalWithMongo._mongoClientPromise) {
     client = new MongoClient(uri, options)
     globalWithMongo._mongoClientPromise = client.connect()
+      .catch(error => {
+        console.error('Failed to connect to MongoDB:', error)
+        throw error
+      })
   }
   clientPromise = globalWithMongo._mongoClientPromise
 } else {
   // In production mode, it's best to not use a global variable.
   client = new MongoClient(uri, options)
   clientPromise = client.connect()
+    .catch(error => {
+      console.error('Failed to connect to MongoDB:', error)
+      throw error
+    })
 }
 
 // Export a module-scoped MongoClient promise. By doing this in a
