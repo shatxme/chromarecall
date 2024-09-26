@@ -40,9 +40,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       message: 'Error processing leaderboard request', 
       error: error instanceof Error ? error.message : String(error)
     });
-  } finally {
-    if (client) {
-      await client.close();
-    }
   }
 }
