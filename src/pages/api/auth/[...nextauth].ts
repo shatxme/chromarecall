@@ -13,7 +13,9 @@ if (!googleId || !googleSecret) {
 const useSecureProps = process.env.NODE_ENV === 'production'
 
 export const authOptions: NextAuthOptions = {
-  adapter: useSecureProps ? MongoDBAdapter(clientPromise) : undefined,
+  adapter: useSecureProps 
+    ? MongoDBAdapter(clientPromise)
+    : undefined,
   providers: [
     GoogleProvider({
       clientId: googleId ?? 'dummy-client-id',

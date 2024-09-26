@@ -29,11 +29,19 @@ if (!uri) {
     if (!global._mongoClientPromise) {
       const client = new MongoClient(uri, options)
       global._mongoClientPromise = client.connect()
+        .catch(err => {
+          console.error('Failed to connect to MongoDB:', err)
+          return mockClient
+        })
     }
     clientPromise = global._mongoClientPromise
   } else {
     const client = new MongoClient(uri, options)
     clientPromise = client.connect()
+      .catch(err => {
+        console.error('Failed to connect to MongoDB:', err)
+        return mockClient
+      })
   }
 }
 
