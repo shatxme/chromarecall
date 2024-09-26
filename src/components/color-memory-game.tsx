@@ -27,8 +27,10 @@ function calculateDifficulty(level: number) {
   // Slower increase in similarity
   const similarity = 0.3 + (Math.min(level, 100) / 100) * 0.65 // 0.3 to 0.95, capped at level 100
   
-  // Adjusted time reduction
-  const viewTime = Math.max(2, Math.round(5 - Math.min(level, 60) / 20)) // 5 to 2 seconds, stabilizes at level 60
+  // Constant view time of 3 seconds
+  const viewTime = 3
+  
+  // Adjusted time reduction for selection time
   const selectionTime = Math.max(6, Math.round(15 - Math.min(level, 90) / 10)) // 15 to 6 seconds, stabilizes at level 90
   
   return { colorCount, similarity, viewTime, selectionTime }
@@ -172,9 +174,14 @@ function GameComponent() {
   return (
     <div className="min-h-screen bg-gray-100 py-6 px-4 sm:py-12 sm:px-6 lg:px-8">
       <div className="max-w-4xl mx-auto">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-4xl sm:text-5xl font-bold text-gray-900">Color Memory Game</h1>
-          <SignInButton />
+        <div className="flex flex-col items-center mb-8">
+          <h1 className="text-4xl sm:text-5xl font-bold text-gray-900 mb-4">Color Memory Game</h1>
+          <div className="flex justify-center items-center space-x-4">
+            <Button onClick={() => setShowLeaderboard(true)} size="sm">
+              <TrophyIcon className="mr-2 h-4 w-4" /> Leaderboard
+            </Button>
+            <SignInButton />
+          </div>
         </div>
         
         {!session ? (
@@ -184,10 +191,7 @@ function GameComponent() {
         ) : !gameState.isPlaying ? (
           <div className="text-center">
             <p className="mb-6 text-lg sm:text-xl">Test your color memory! Select the color you saw after it disappears.</p>
-            <Button onClick={startGame} size="lg" className="text-lg px-8 py-4 mr-4">Start Game</Button>
-            <Button onClick={() => setShowLeaderboard(true)} size="lg" className="text-lg px-8 py-4">
-              <TrophyIcon className="mr-2 h-4 w-4" /> Leaderboard
-            </Button>
+            <Button onClick={startGame} size="lg" className="text-lg px-8 py-4">Start Game</Button>
             {gameState.highScore > 0 && <p className="mt-6 text-xl">High Score: {gameState.highScore}</p>}
           </div>
         ) : (
