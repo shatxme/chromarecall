@@ -8,7 +8,9 @@ interface ColorSwatchProps {
 }
 
 export default function ColorSwatch({ color, size = 'small', onClick, className }: ColorSwatchProps) {
-  const sizeClasses = size === 'large' ? 'w-56 h-56 sm:w-64 sm:h-64 md:w-80 md:h-80' : 'w-24 h-24 sm:w-32 sm:h-32 md:w-40 md:h-40'
+  const sizeClasses = size === 'large' 
+    ? 'w-48 h-48 sm:w-72 sm:h-72' 
+    : 'w-20 h-20 sm:w-36 sm:h-36'
   
   return (
     <button
