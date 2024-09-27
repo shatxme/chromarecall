@@ -256,29 +256,42 @@ function GameComponent() {
 
   const renderColorSwatches = () => {
     const totalColors = gameState.options.length;
-    const firstRowColors = Math.min(5, totalColors);
-    const secondRowColors = Math.max(0, totalColors - 5);
+    const firstRowColors = Math.min(3, totalColors);
+    const secondRowColors = Math.min(3, totalColors - 3);
+    const thirdRowColors = Math.max(0, totalColors - 6);
 
     return (
-      <div className="flex flex-col items-center gap-6 sm:gap-8">
-        <div className="flex justify-center gap-6 sm:gap-8 flex-wrap">
+      <div className="flex flex-col items-center gap-4">
+        <div className="flex justify-center gap-4 flex-wrap">
           {gameState.options.slice(0, firstRowColors).map((color, index) => (
             <ColorSwatch
               key={`first-row-${index}`}
               color={color}
               onClick={() => handleColorSelect(color)}
-              className={`w-28 h-28 sm:w-36 sm:h-36 ${index >= 3 ? 'order-last' : ''}`}
+              className="w-24 h-24 sm:w-28 sm:h-28"
             />
           ))}
         </div>
         {secondRowColors > 0 && (
-          <div className="flex justify-center gap-6 sm:gap-8 flex-wrap">
-            {gameState.options.slice(5).map((color, index) => (
+          <div className="flex justify-center gap-4 flex-wrap">
+            {gameState.options.slice(3, 6).map((color, index) => (
               <ColorSwatch
                 key={`second-row-${index}`}
                 color={color}
                 onClick={() => handleColorSelect(color)}
-                className="w-28 h-28 sm:w-36 sm:h-36"
+                className="w-24 h-24 sm:w-28 sm:h-28"
+              />
+            ))}
+          </div>
+        )}
+        {thirdRowColors > 0 && (
+          <div className="flex justify-center gap-4 flex-wrap">
+            {gameState.options.slice(6).map((color, index) => (
+              <ColorSwatch
+                key={`third-row-${index}`}
+                color={color}
+                onClick={() => handleColorSelect(color)}
+                className="w-24 h-24 sm:w-28 sm:h-28"
               />
             ))}
           </div>
@@ -294,34 +307,34 @@ function GameComponent() {
   return (
     <div className="p-4 pb-6 relative">
       <div className="absolute top-4 left-4 right-4 flex justify-between items-center">
-        <Button onClick={() => setShowLeaderboard(true)} size="default" className="h-10">
-          <TrophyIcon className="mr-2 h-5 w-5" /> Leaderboard
+        <Button onClick={() => setShowLeaderboard(true)} size="sm" className="h-8 text-xs sm:text-sm sm:h-10">
+          <TrophyIcon className="mr-1 h-4 w-4" /> Leaderboard
         </Button>
         <SignInButton />
       </div>
       
       {!gameState.isPlaying ? (
-        <div className="text-center mt-20"> {/* Increased top margin */}
-          <p className="mb-8 text-xl sm:text-2xl">Ready to test your color perception skills? Let&apos;s go!</p>
+        <div className="text-center mt-16 sm:mt-20">
+          <p className="mb-6 text-lg sm:text-xl">Ready to test your color perception skills? Let&apos;s go!</p>
           <Button 
             onClick={startGame} 
             size="lg" 
-            className="text-xl px-12 py-6 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700"
+            className="text-lg px-8 py-4 sm:text-xl sm:px-12 sm:py-6 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700"
           >
             Start Game
           </Button>
-          {!session && <p className="mt-6 text-sm text-gray-600">Sign in to save your scores and compete on the leaderboard!</p>}
+          {!session && <p className="mt-4 text-xs sm:text-sm text-gray-600">Sign in to save your scores and compete on the leaderboard!</p>}
         </div>
       ) : (
-        <div className="space-y-6 mt-16"> {/* Increased top margin */}
-          <div className="h-12 flex items-center justify-center">
+        <div className="space-y-4 sm:space-y-6 mt-14 sm:mt-16">
+          <div className="h-10 sm:h-12 flex items-center justify-center">
             <AnimatePresence>
               {showFeedback && (
                 <motion.div
                   initial={{ opacity: 0, y: -20 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: 20 }}
-                  className={`text-2xl font-bold text-center absolute ${exactMatch ? 'text-green-500' : 'text-yellow-500'}`}
+                  className={`text-xl sm:text-2xl font-bold text-center absolute ${exactMatch ? 'text-green-500' : 'text-yellow-500'}`}
                 >
                   {feedbackText}
                 </motion.div>
@@ -331,16 +344,16 @@ function GameComponent() {
           <ScoreDisplay gameState={gameState} comboMultiplier={comboMultiplier} closeMatches={closeMatches} closeMatchLimit={gameState.level <= 50 ? 3 : 1} />
           <div className="flex justify-center">
             {showTarget ? (
-              <ColorSwatch color={gameState.targetColor} size="large" className="w-72 h-72 sm:w-96 sm:h-96" />
+              <ColorSwatch color={gameState.targetColor} size="large" className="w-56 h-56 sm:w-72 sm:h-72" />
             ) : (
-              <div className="w-full max-w-4xl">
+              <div className="w-full max-w-md sm:max-w-lg">
                 {renderColorSwatches()}
               </div>
             )}
           </div>
           <Progress 
             value={(gameState.timeLeft / calculateDifficulty(gameState.level, performanceRating)[showTarget ? 'viewTime' : 'selectionTime']) * 100} 
-            className="h-4 w-full"
+            className="h-3 sm:h-4 w-full"
           />
         </div>
       )}
