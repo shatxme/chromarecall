@@ -254,7 +254,7 @@ function GameComponent() {
     });
   }
 
-  const renderColorSwatches = () => {
+  const renderColorSwatches = useCallback(() => {
     const totalColors = gameState.options.length;
     const firstRowColors = Math.min(5, totalColors);
     const secondRowColors = Math.max(0, totalColors - 5);
@@ -262,20 +262,20 @@ function GameComponent() {
     return (
       <div className="flex flex-col items-center gap-2 sm:gap-8">
         <div className="flex justify-center gap-2 sm:gap-8 flex-wrap">
-          {gameState.options.slice(0, firstRowColors).map((color, index) => (
+          {gameState.options.slice(0, firstRowColors).map((color) => (
             <ColorSwatch
-              key={`${color}-${index}`}
+              key={color}
               color={color}
               onClick={() => handleColorSelect(color)}
-              className={`w-[5.5rem] h-[5.5rem] sm:w-36 sm:h-36 ${index >= 3 ? 'order-last sm:order-none' : ''}`}
+              className="w-[5.5rem] h-[5.5rem] sm:w-36 sm:h-36"
             />
           ))}
         </div>
         {secondRowColors > 0 && (
           <div className="flex justify-center gap-2 sm:gap-8 flex-wrap">
-            {gameState.options.slice(5).map((color, index) => (
+            {gameState.options.slice(5).map((color) => (
               <ColorSwatch
-                key={`${color}-${index + 5}`}
+                key={color}
                 color={color}
                 onClick={() => handleColorSelect(color)}
                 className="w-[5.5rem] h-[5.5rem] sm:w-36 sm:h-36"
@@ -285,7 +285,7 @@ function GameComponent() {
         )}
       </div>
     );
-  };
+  }, [gameState.options, handleColorSelect]);
 
   if (isLoading) {
     return <div className="flex justify-center items-center h-screen">Loading...</div>
@@ -332,21 +332,16 @@ function GameComponent() {
           </div>
           <ScoreDisplay gameState={gameState} comboMultiplier={comboMultiplier} closeMatches={closeMatches} closeMatchLimit={gameState.level <= 50 ? 3 : 1} />
           <div className="flex justify-center my-8 sm:my-0">
-            <AnimatePresence mode="wait">
-              {showTarget ? (
-                <div key={`target-${gameState.level}-${gameState.targetColor}`}>
-                  <ColorSwatch 
-                    color={gameState.targetColor} 
-                    size="large" 
-                    className="w-56 h-56 sm:w-72 sm:h-72" 
-                  />
-                </div>
-              ) : (
-                <div key="selection-colors" className="w-full max-w-xs sm:max-w-4xl">
-                  {renderColorSwatches()}
-                </div>
-              )}
-            </AnimatePresence>
+            {showTarget ? (
+              <ColorSwatch 
+                key={`target-${gameState.targetColor}`}
+                color={gameState.targetColor} 
+                size="large" 
+                className="w-56 h-56 sm:w-72 sm:h-72" 
+              />
+            ) : (
+              renderColorSwatches()
+            )}
           </div>
           <Progress 
             value={(gameState.timeLeft / calculateDifficulty(gameState.level, performanceRating)[showTarget ? 'viewTime' : 'selectionTime']) * 100} 
