@@ -26,20 +26,39 @@ const SignInButton = dynamic(() => import('./SignInButton').then(mod => mod.Sign
   ssr: false
 })
 
-function calculateDifficulty(level: number) {
-  // Slower progression for color count
-  const colorCount = Math.min(10, 3 + Math.floor((level - 1) / 15)) // 3 to 10 colors, incrementing every 15 levels
-  
-  // Slower increase in similarity
-  const similarity = 0.3 + (Math.min(level, 100) / 100) * 0.65 // 0.3 to 0.95, capped at level 100
-  
-  // Constant view time of 3 seconds
-  const viewTime = 3
-  
-  // Adjusted time reduction for selection time
-  const selectionTime = Math.max(6, Math.round(15 - Math.min(level, 90) / 10)) // 15 to 6 seconds, stabilizes at level 90
-  
-  return { colorCount, similarity, viewTime, selectionTime }
+function calculateDifficulty(level: number, performanceRating: number) {
+  // Color count calculation
+  const baseColorCount = 3;
+  const additionalColors = Math.floor(level / 10);
+  const colorCount = Math.min(10, baseColorCount + additionalColors);
+
+  // Similarity calculation
+  let similarity;
+  if (level <= 10) {
+    similarity = 0.7 + (level * 0.01); // Start at 0.7, increase by 0.01 per level for first 10 levels
+  } else if (level <= 30) {
+    similarity = 0.8 + ((level - 10) * 0.005); // Gradual increase from level 11 to 30
+  } else if (level <= 50) {
+    similarity = 0.9 + ((level - 30) * 0.003); // Steeper increase from level 31 to 50
+  } else {
+    similarity = 0.96 + ((level - 50) * 0.0005); // Slower increase after level 50
+  }
+  similarity = Math.min(0.99, similarity * performanceRating);
+
+  // Selection time calculation
+  let selectionTime;
+  if (level <= 10) {
+    selectionTime = 15;
+  } else if (level <= 80) {
+    selectionTime = Math.max(2, 15 - Math.floor((level - 10) / 5));
+  } else {
+    selectionTime = 2;
+  }
+  selectionTime = Math.max(2, Math.round(selectionTime / performanceRating));
+
+  const viewTime = 3; // Constant view time of 3 seconds
+
+  return { colorCount, similarity, viewTime, selectionTime };
 }
 
 function GameComponent() {
@@ -57,11 +76,14 @@ function GameComponent() {
   const [showTarget, setShowTarget] = useState(false)
   const [showLossDialog, setShowLossDialog] = useState(false)
   const [showLeaderboard, setShowLeaderboard] = useState(false)
-  const [consecutiveCorrect, setConsecutiveCorrect] = useState(0);
   const [isNewHighScore, setIsNewHighScore] = useState(false);
   const [feedbackText, setFeedbackText] = useState("")
   const [showFeedback, setShowFeedback] = useState(false)
-  const [streak, setStreak] = useState(0)
+  const [exactMatch, setExactMatch] = useState(false);
+  const [performanceRating, setPerformanceRating] = useState(1);
+  const [closeMatches, setCloseMatches] = useState(0);
+  const [levelStarted, setLevelStarted] = useState(0);
+  const [comboMultiplier, setComboMultiplier] = useState(1);
 
   const endGame = useCallback(async (lost = false) => {
     setGameState(prev => {
@@ -125,18 +147,18 @@ function GameComponent() {
     } else if (gameState.isPlaying && gameState.timeLeft === 0) {
       if (showTarget) {
         setShowTarget(false)
-        const { selectionTime } = calculateDifficulty(gameState.level)
+        const { selectionTime } = calculateDifficulty(gameState.level, performanceRating)
         setGameState(prev => ({ ...prev, timeLeft: selectionTime }))
       } else {
         endGame(true)
       }
     }
     return () => clearInterval(timer)
-  }, [gameState.isPlaying, gameState.timeLeft, showTarget, gameState.level, endGame])
+  }, [gameState.isPlaying, gameState.timeLeft, showTarget, gameState.level, endGame, performanceRating])
 
   function startGame() {
     setIsLoading(true)
-    const { colorCount, similarity, viewTime } = calculateDifficulty(1)
+    const { colorCount, similarity, viewTime } = calculateDifficulty(1, 1) // Start with neutral performance rating
     const { target, options } = generateColors(colorCount, similarity)
     setGameState(prev => ({
       ...prev,
@@ -150,39 +172,69 @@ function GameComponent() {
     setShowTarget(true)
     setIsLoading(false)
     setShowLossDialog(false)
+    setComboMultiplier(1)
+    setCloseMatches(0)
+    setLevelStarted(0)
+    setPerformanceRating(1) // Reset performance rating when starting a new game
   }
 
   function handleColorSelect(selectedColor: string) {
     const difference = calculateColorDifference(gameState.targetColor, selectedColor);
-    const timeBonus = Math.max(0, gameState.timeLeft / calculateDifficulty(gameState.level).selectionTime);
+    const { selectionTime } = calculateDifficulty(gameState.level, performanceRating);
+    const timeBonus = Math.max(0, gameState.timeLeft / selectionTime);
     
-    if (difference >= 0.1) {
-      setFeedbackText("Almost right!")
-      setStreak(0)
+    const similarityThreshold = 0.1 - (Math.min(gameState.level, 50) * 0.001);
+    const isExactMatch = difference < 0.01;
+    setExactMatch(isExactMatch);
+    
+    // Check if we've exceeded the close match limit
+    const closeMatchLimit = gameState.level <= 50 ? 3 : 1;
+    const currentTenLevelBlock = Math.floor(gameState.level / 10);
+    
+    if (levelStarted !== currentTenLevelBlock) {
+      setLevelStarted(currentTenLevelBlock);
+      setCloseMatches(0);
+    }
+
+    if (!isExactMatch && closeMatches >= closeMatchLimit) {
+      setFeedbackText("Game Over! Too many close matches.");
+      endGame(true);
+      return;
+    }
+
+    if (difference >= similarityThreshold) {
+      setFeedbackText("Game Over! Color mismatch.");
       endGame(true);
       return;
     }
     
+    if (!isExactMatch) {
+      setCloseMatches(prev => prev + 1);
+      setPerformanceRating(prev => Math.max(0.9, prev - 0.02)); // Slightly decrease performance rating
+    } else {
+      setPerformanceRating(prev => Math.min(1.1, prev + 0.01)); // Increase performance rating
+    }
+    
+    let newComboMultiplier = comboMultiplier;
+    if (isExactMatch) {
+      newComboMultiplier = Math.min(5, comboMultiplier + 0.5);
+      setComboMultiplier(newComboMultiplier);
+    } else {
+      newComboMultiplier = 1;
+      setComboMultiplier(1); // Reset multiplier on close match
+    }
+    
     const accuracyPoints = Math.max(0, 100 - Math.round(difference * 1000));
     const speedPoints = Math.round(timeBonus * 50);
-    const bonusPoints = Math.min(50, consecutiveCorrect * 5);
-    const totalPoints = accuracyPoints + speedPoints + bonusPoints;
+    const totalPoints = Math.round((accuracyPoints + speedPoints) * newComboMultiplier);
     
-    setConsecutiveCorrect(prev => prev + 1);
-    setStreak(prev => prev + 1);
-    
-    // Set feedback text
-    const perfectGuess = difference < 0.01;
-    const feedbackOptions = perfectGuess 
-      ? ["Perfect!", "Excellent!", "Spot on!", "Brilliant!"]
-      : ["Correct!", "Nice job!", "Well done!", "Good eye!"];
-    setFeedbackText(feedbackOptions[Math.floor(Math.random() * feedbackOptions.length)]);
+    setFeedbackText(isExactMatch ? `Perfect! ${newComboMultiplier.toFixed(1)}x Combo!` : "Close enough!");
     
     setShowFeedback(true);
     setTimeout(() => setShowFeedback(false), 1000);
 
     const newLevel = gameState.level + 1;
-    const { colorCount, similarity, viewTime } = calculateDifficulty(newLevel);
+    const { colorCount, similarity, viewTime } = calculateDifficulty(newLevel, performanceRating);
     const { target, options } = generateColors(colorCount, similarity);
     
     setGameState(prev => ({
@@ -198,9 +250,42 @@ function GameComponent() {
     
     toast({
       title: "Color Selected!",
-      description: `You earned ${totalPoints} points! (Accuracy: ${accuracyPoints}, Speed: ${speedPoints}, Bonus: ${bonusPoints})`,
+      description: `You earned ${totalPoints} points! (Accuracy: ${accuracyPoints}, Speed: ${speedPoints}${newComboMultiplier > 1 ? `, Combo: ${newComboMultiplier.toFixed(1)}x` : ''})`,
     });
   }
+
+  const renderColorSwatches = () => {
+    const totalColors = gameState.options.length;
+    const firstRowColors = Math.min(5, totalColors);
+    const secondRowColors = Math.max(0, totalColors - 5);
+
+    return (
+      <div className="flex flex-col items-center gap-6 sm:gap-8">
+        <div className="flex justify-center gap-6 sm:gap-8 flex-wrap">
+          {gameState.options.slice(0, firstRowColors).map((color, index) => (
+            <ColorSwatch
+              key={`first-row-${index}`}
+              color={color}
+              onClick={() => handleColorSelect(color)}
+              className={`w-28 h-28 sm:w-36 sm:h-36 ${index >= 3 ? 'order-last' : ''}`}
+            />
+          ))}
+        </div>
+        {secondRowColors > 0 && (
+          <div className="flex justify-center gap-6 sm:gap-8 flex-wrap">
+            {gameState.options.slice(5).map((color, index) => (
+              <ColorSwatch
+                key={`second-row-${index}`}
+                color={color}
+                onClick={() => handleColorSelect(color)}
+                className="w-28 h-28 sm:w-36 sm:h-36"
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   if (isLoading) {
     return <div className="flex justify-center items-center h-screen">Loading...</div>
@@ -238,32 +323,25 @@ function GameComponent() {
                   initial={{ opacity: 0, y: -20 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: 20 }}
-                  className="text-2xl font-bold text-center text-green-500 absolute"
+                  className={`text-2xl font-bold text-center absolute ${exactMatch ? 'text-green-500' : 'text-yellow-500'}`}
                 >
                   {feedbackText}
                 </motion.div>
               )}
             </AnimatePresence>
           </div>
-          <ScoreDisplay gameState={gameState} streak={streak} />
+          <ScoreDisplay gameState={gameState} comboMultiplier={comboMultiplier} closeMatches={closeMatches} closeMatchLimit={gameState.level <= 50 ? 3 : 1} />
           <div className="flex justify-center">
             {showTarget ? (
-              <ColorSwatch color={gameState.targetColor} size="large" className="w-64 h-64 sm:w-80 sm:h-80" />
+              <ColorSwatch color={gameState.targetColor} size="large" className="w-72 h-72 sm:w-96 sm:h-96" />
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 sm:gap-6">
-                {gameState.options.map((color, index) => (
-                  <ColorSwatch
-                    key={index}
-                    color={color}
-                    onClick={() => handleColorSelect(color)}
-                    className="w-32 h-32 sm:w-40 sm:h-40"
-                  />
-                ))}
+              <div className="w-full max-w-4xl">
+                {renderColorSwatches()}
               </div>
             )}
           </div>
           <Progress 
-            value={(gameState.timeLeft / calculateDifficulty(gameState.level)[showTarget ? 'viewTime' : 'selectionTime']) * 100} 
+            value={(gameState.timeLeft / calculateDifficulty(gameState.level, performanceRating)[showTarget ? 'viewTime' : 'selectionTime']) * 100} 
             className="h-4 w-full"
           />
         </div>

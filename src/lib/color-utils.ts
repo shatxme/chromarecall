@@ -97,18 +97,33 @@ export function generateColors(colorCount: number, similarity: number): { target
   const target = generateRandomColor();
   const options = [target];
   
-  const colorDifferenceThreshold = 1 - similarity;
-  const maxAttempts = 1000; // Prevent infinite loop
+  const colorDifferenceThreshold = (1 - similarity) * 0.1;
+  const decoyThreshold = colorDifferenceThreshold * 0.5;
+  const maxAttempts = 1000;
   
-  for (let i = 1; i < colorCount; i++) {
+  // Generate a decoy color
+  let decoy;
+  do {
+    decoy = generateSimilarColor(target, similarity + 0.05);
+  } while (calculateColorDifference(target, decoy) < decoyThreshold);
+  options.push(decoy);
+  
+  // Generate other colors
+  for (let i = 2; i < colorCount; i++) {
     let option;
     let attempts = 0;
     do {
       option = generateSimilarColor(target, similarity);
       attempts++;
-    } while (calculateColorDifference(target, option) > colorDifferenceThreshold && attempts < maxAttempts);
+    } while (calculateColorDifference(target, option) < colorDifferenceThreshold && attempts < maxAttempts);
     
     options.push(option);
+  }
+  
+  // Ensure at least one noticeably different color
+  if (colorCount > 3) {
+    const distinctColor = generateDistinctColor(target, similarity);
+    options[options.length - 1] = distinctColor;
   }
   
   return { target, options: shuffleArray(options) };
@@ -125,6 +140,21 @@ function generateSimilarColor(baseColor: string, similarity: number): string {
   const newLightness = Math.max(0, Math.min(100, l + (Math.random() * 2 - 1) * lightnessRange));
 
   return hslToHex(newHue, newSaturation, newLightness);
+}
+
+function generateDistinctColor(baseColor: string, similarity: number): string {
+  const [h, s, l] = hex2hsl(baseColor);
+  const hueShift = 180 + (Math.random() - 0.5) * 60; // Opposite hue with some variation
+  const newHue = (h + hueShift) % 360;
+  const newSaturation = Math.max(20, Math.min(80, s + (Math.random() - 0.5) * 40));
+  const newLightness = Math.max(20, Math.min(80, l + (Math.random() - 0.5) * 40));
+  
+  // Use similarity to adjust the distinctness
+  const adjustedHue = (newHue + (1 - similarity) * 180) % 360;
+  const adjustedSaturation = Math.max(0, Math.min(100, newSaturation + (1 - similarity) * 50));
+  const adjustedLightness = Math.max(0, Math.min(100, newLightness + (1 - similarity) * 50));
+  
+  return hslToHex(adjustedHue, adjustedSaturation, adjustedLightness);
 }
 
 export function calculateColorDifference(color1: string, color2: string): number {
@@ -235,11 +265,37 @@ export function calculateTimeForLevel(level: number): number {
 }
 
 // Update the calculateDifficulty function
-export function calculateDifficulty(level: number) {
-  const colorCount = Math.min(8, 3 + Math.floor(level / 5)); // Max 8 colors, increase every 5 levels
-  const similarity = Math.min(0.95, 0.7 + (level * 0.01)); // Start at 0.7, increase by 0.01 per level, max 0.95
-  const viewTime = Math.max(2, 5 - Math.floor(level / 10)); // Start at 5s, decrease by 1s every 10 levels, min 2s
-  const selectionTime = Math.max(5, 15 - Math.floor(level / 5)); // Start at 15s, decrease by 1s every 5 levels, min 5s
-  
+export function calculateDifficulty(level: number, performanceRating: number) {
+  // Color count calculation
+  const baseColorCount = 3;
+  const additionalColors = Math.floor(level / 10);
+  const colorCount = Math.min(10, baseColorCount + additionalColors);
+
+  // Similarity calculation
+  let similarity;
+  if (level <= 10) {
+    similarity = 0.7 + (level * 0.01); // Easier start
+  } else if (level <= 30) {
+    similarity = 0.8 + ((level - 10) * 0.005); // Gradual increase
+  } else if (level <= 50) {
+    similarity = 0.9 + ((level - 30) * 0.003); // Steeper increase
+  } else {
+    similarity = 0.96 + ((level - 50) * 0.0005); // Slower increase after 50
+  }
+  similarity = Math.min(0.99, similarity * performanceRating);
+
+  // Selection time calculation
+  let selectionTime;
+  if (level <= 10) {
+    selectionTime = 15;
+  } else if (level <= 80) {
+    selectionTime = Math.max(2, 15 - Math.floor((level - 10) / 5));
+  } else {
+    selectionTime = 2;
+  }
+  selectionTime = Math.max(2, Math.round(selectionTime / performanceRating));
+
+  const viewTime = 3; // Constant view time of 3 seconds
+
   return { colorCount, similarity, viewTime, selectionTime };
 }
