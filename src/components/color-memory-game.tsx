@@ -262,43 +262,25 @@ function GameComponent() {
     return (
       <div className="flex flex-col items-center gap-2 sm:gap-8">
         <div className="flex justify-center gap-2 sm:gap-8 flex-wrap">
-          <AnimatePresence>
-            {gameState.options.slice(0, firstRowColors).map((color, index) => (
-              <motion.div
-                key={`${gameState.level}-${color}-${index}`}
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                exit={{ scale: 0 }}
-                transition={{ type: "spring", stiffness: 300, damping: 20 }}
-              >
-                <ColorSwatch
-                  color={color}
-                  onClick={() => handleColorSelect(color)}
-                  className={`w-[5.5rem] h-[5.5rem] sm:w-36 sm:h-36 ${index >= 3 ? 'order-last sm:order-none' : ''}`}
-                />
-              </motion.div>
-            ))}
-          </AnimatePresence>
+          {gameState.options.slice(0, firstRowColors).map((color, index) => (
+            <ColorSwatch
+              key={`${gameState.level}-${color}-${index}`}
+              color={color}
+              onClick={() => handleColorSelect(color)}
+              className={`w-[5.5rem] h-[5.5rem] sm:w-36 sm:h-36 ${index >= 3 ? 'order-last sm:order-none' : ''}`}
+            />
+          ))}
         </div>
         {secondRowColors > 0 && (
           <div className="flex justify-center gap-2 sm:gap-8 flex-wrap">
-            <AnimatePresence>
-              {gameState.options.slice(5).map((color, index) => (
-                <motion.div
-                  key={`${gameState.level}-${color}-${index + 5}`}
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  exit={{ scale: 0 }}
-                  transition={{ type: "spring", stiffness: 300, damping: 20 }}
-                >
-                  <ColorSwatch
-                    color={color}
-                    onClick={() => handleColorSelect(color)}
-                    className="w-[5.5rem] h-[5.5rem] sm:w-36 sm:h-36"
-                  />
-                </motion.div>
-              ))}
-            </AnimatePresence>
+            {gameState.options.slice(5).map((color, index) => (
+              <ColorSwatch
+                key={`${gameState.level}-${color}-${index + 5}`}
+                color={color}
+                onClick={() => handleColorSelect(color)}
+                className="w-[5.5rem] h-[5.5rem] sm:w-36 sm:h-36"
+              />
+            ))}
           </div>
         )}
       </div>
@@ -352,30 +334,17 @@ function GameComponent() {
           <div className="flex justify-center my-8 sm:my-0">
             <AnimatePresence mode="wait">
               {showTarget ? (
-                <motion.div
-                  key={`target-${gameState.level}-${gameState.targetColor}`}
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  exit={{ scale: 0 }}
-                  transition={{ type: "spring", stiffness: 300, damping: 20 }}
-                >
+                <div key={`target-${gameState.level}-${gameState.targetColor}`}>
                   <ColorSwatch 
                     color={gameState.targetColor} 
                     size="large" 
                     className="w-56 h-56 sm:w-72 sm:h-72" 
                   />
-                </motion.div>
+                </div>
               ) : (
-                <motion.div
-                  key="selection-colors"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                >
-                  <div className="w-full max-w-xs sm:max-w-4xl">
-                    {renderColorSwatches()}
-                  </div>
-                </motion.div>
+                <div key="selection-colors" className="w-full max-w-xs sm:max-w-4xl">
+                  {renderColorSwatches()}
+                </div>
               )}
             </AnimatePresence>
           </div>
