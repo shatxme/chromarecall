@@ -178,7 +178,7 @@ function GameComponent() {
     setPerformanceRating(1) // Reset performance rating when starting a new game
   }
 
-  function handleColorSelect(selectedColor: string) {
+  const handleColorSelect = useCallback((selectedColor: string) => {
     const difference = calculateColorDifference(gameState.targetColor, selectedColor);
     const { selectionTime } = calculateDifficulty(gameState.level, performanceRating);
     const timeBonus = Math.max(0, gameState.timeLeft / selectionTime);
@@ -252,7 +252,7 @@ function GameComponent() {
       title: "Color Selected!",
       description: `You earned ${totalPoints} points! (Accuracy: ${accuracyPoints}, Speed: ${speedPoints}${newComboMultiplier > 1 ? `, Combo: ${newComboMultiplier.toFixed(1)}x` : ''})`,
     });
-  }
+  }, [gameState, performanceRating, levelStarted, closeMatches, comboMultiplier, endGame, setExactMatch, setLevelStarted, setCloseMatches, setPerformanceRating, setComboMultiplier, setFeedbackText, setShowFeedback, setGameState, setShowTarget]);
 
   const renderColorSwatches = useCallback(() => {
     const totalColors = gameState.options.length;
@@ -263,41 +263,23 @@ function GameComponent() {
       <div className="flex flex-col items-center gap-2 sm:gap-8">
         <div className="flex justify-center gap-2 sm:gap-8 flex-wrap">
           {gameState.options.slice(0, firstRowColors).map((color) => (
-            <React.Fragment key={color}>
-              {/* Mobile version without animation */}
-              <button
-                className="w-[5.5rem] h-[5.5rem] rounded-lg shadow-lg transition-transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:hidden"
-                style={{ backgroundColor: color }}
-                onClick={() => handleColorSelect(color)}
-                aria-label={`Color: ${color}`}
-              />
-              {/* Desktop version with animation */}
-              <ColorSwatch
-                color={color}
-                onClick={() => handleColorSelect(color)}
-                className="hidden sm:block sm:w-36 sm:h-36"
-              />
-            </React.Fragment>
+            <ColorSwatch
+              key={color}
+              color={color}
+              onClick={() => handleColorSelect(color)}
+              className="w-[5.5rem] h-[5.5rem] sm:w-36 sm:h-36"
+            />
           ))}
         </div>
         {secondRowColors > 0 && (
           <div className="flex justify-center gap-2 sm:gap-8 flex-wrap">
             {gameState.options.slice(5).map((color) => (
-              <React.Fragment key={color}>
-                {/* Mobile version without animation */}
-                <button
-                  className="w-[5.5rem] h-[5.5rem] rounded-lg shadow-lg transition-transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:hidden"
-                  style={{ backgroundColor: color }}
-                  onClick={() => handleColorSelect(color)}
-                  aria-label={`Color: ${color}`}
-                />
-                {/* Desktop version with animation */}
-                <ColorSwatch
-                  color={color}
-                  onClick={() => handleColorSelect(color)}
-                  className="hidden sm:block sm:w-36 sm:h-36"
-                />
-              </React.Fragment>
+              <ColorSwatch
+                key={color}
+                color={color}
+                onClick={() => handleColorSelect(color)}
+                className="w-[5.5rem] h-[5.5rem] sm:w-36 sm:h-36"
+              />
             ))}
           </div>
         )}
@@ -319,7 +301,7 @@ function GameComponent() {
       </div>
       
       {!gameState.isPlaying && (
-        <div className="text-center mt-32 sm:mt-24">
+        <div className="text-center mt-20 sm:mt-24">
           <p className="mb-6 text-base sm:text-lg md:text-xl">Ready to test your color perception skills?</p>
           <Button 
             onClick={startGame} 
@@ -334,7 +316,7 @@ function GameComponent() {
       
       {gameState.isPlaying && (
         <div className="space-y-2 sm:space-y-4 mt-20 sm:mt-16">
-          <div className="h-8 sm:h-10 md:h-12 flex items-center justify-center">
+          <div className="h-6 sm:h-8 md:h-10 flex items-center justify-center">
             <AnimatePresence>
               {showFeedback && (
                 <motion.div
@@ -351,20 +333,12 @@ function GameComponent() {
           <ScoreDisplay gameState={gameState} comboMultiplier={comboMultiplier} closeMatches={closeMatches} closeMatchLimit={gameState.level <= 50 ? 3 : 1} />
           <div className="flex justify-center my-8 sm:my-0">
             {showTarget ? (
-              <React.Fragment>
-                {/* Mobile version without animation */}
-                <div
-                  className="w-56 h-56 rounded-lg shadow-lg sm:hidden"
-                  style={{ backgroundColor: gameState.targetColor }}
-                />
-                {/* Desktop version with animation */}
-                <ColorSwatch 
-                  key={`target-${gameState.targetColor}`}
-                  color={gameState.targetColor} 
-                  size="large" 
-                  className="hidden sm:block sm:w-72 sm:h-72" 
-                />
-              </React.Fragment>
+              <ColorSwatch 
+                key={`target-${gameState.targetColor}`}
+                color={gameState.targetColor} 
+                size="large" 
+                className="w-56 h-56 sm:w-72 sm:h-72" 
+              />
             ) : (
               renderColorSwatches()
             )}
