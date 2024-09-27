@@ -263,23 +263,41 @@ function GameComponent() {
       <div className="flex flex-col items-center gap-2 sm:gap-8">
         <div className="flex justify-center gap-2 sm:gap-8 flex-wrap">
           {gameState.options.slice(0, firstRowColors).map((color) => (
-            <ColorSwatch
-              key={color}
-              color={color}
-              onClick={() => handleColorSelect(color)}
-              className="w-[5.5rem] h-[5.5rem] sm:w-36 sm:h-36"
-            />
+            <React.Fragment key={color}>
+              {/* Mobile version without animation */}
+              <button
+                className="w-[5.5rem] h-[5.5rem] rounded-lg shadow-lg transition-transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:hidden"
+                style={{ backgroundColor: color }}
+                onClick={() => handleColorSelect(color)}
+                aria-label={`Color: ${color}`}
+              />
+              {/* Desktop version with animation */}
+              <ColorSwatch
+                color={color}
+                onClick={() => handleColorSelect(color)}
+                className="hidden sm:block sm:w-36 sm:h-36"
+              />
+            </React.Fragment>
           ))}
         </div>
         {secondRowColors > 0 && (
           <div className="flex justify-center gap-2 sm:gap-8 flex-wrap">
             {gameState.options.slice(5).map((color) => (
-              <ColorSwatch
-                key={color}
-                color={color}
-                onClick={() => handleColorSelect(color)}
-                className="w-[5.5rem] h-[5.5rem] sm:w-36 sm:h-36"
-              />
+              <React.Fragment key={color}>
+                {/* Mobile version without animation */}
+                <button
+                  className="w-[5.5rem] h-[5.5rem] rounded-lg shadow-lg transition-transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:hidden"
+                  style={{ backgroundColor: color }}
+                  onClick={() => handleColorSelect(color)}
+                  aria-label={`Color: ${color}`}
+                />
+                {/* Desktop version with animation */}
+                <ColorSwatch
+                  color={color}
+                  onClick={() => handleColorSelect(color)}
+                  className="hidden sm:block sm:w-36 sm:h-36"
+                />
+              </React.Fragment>
             ))}
           </div>
         )}
@@ -333,12 +351,20 @@ function GameComponent() {
           <ScoreDisplay gameState={gameState} comboMultiplier={comboMultiplier} closeMatches={closeMatches} closeMatchLimit={gameState.level <= 50 ? 3 : 1} />
           <div className="flex justify-center my-8 sm:my-0">
             {showTarget ? (
-              <ColorSwatch 
-                key={`target-${gameState.targetColor}`}
-                color={gameState.targetColor} 
-                size="large" 
-                className="w-56 h-56 sm:w-72 sm:h-72" 
-              />
+              <React.Fragment>
+                {/* Mobile version without animation */}
+                <div
+                  className="w-56 h-56 rounded-lg shadow-lg sm:hidden"
+                  style={{ backgroundColor: gameState.targetColor }}
+                />
+                {/* Desktop version with animation */}
+                <ColorSwatch 
+                  key={`target-${gameState.targetColor}`}
+                  color={gameState.targetColor} 
+                  size="large" 
+                  className="hidden sm:block sm:w-72 sm:h-72" 
+                />
+              </React.Fragment>
             ) : (
               renderColorSwatches()
             )}
