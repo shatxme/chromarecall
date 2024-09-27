@@ -3,8 +3,8 @@ import "./globals.css"
 import { Providers } from './providers'
 
 export const metadata: Metadata = {
-  title: "Color Memory Game",
-  description: "A color palette game",
+  title: "Chroma Recall",
+  description: "A color memory challenge game",
 }
 
 export default function RootLayout({

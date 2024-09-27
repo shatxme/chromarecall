@@ -293,17 +293,15 @@ function GameComponent() {
 
   return (
     <div className="p-4 pb-6 relative">
-      <div className="absolute top-2 left-2">
+      <div className="absolute top-4 left-4 right-4 flex justify-between items-center">
         <Button onClick={() => setShowLeaderboard(true)} size="default" className="h-10">
           <TrophyIcon className="mr-2 h-5 w-5" /> Leaderboard
         </Button>
-      </div>
-      <div className="absolute top-2 right-2">
         <SignInButton />
       </div>
       
       {!gameState.isPlaying ? (
-        <div className="text-center mt-16">
+        <div className="text-center mt-20"> {/* Increased top margin */}
           <p className="mb-8 text-xl sm:text-2xl">Ready to test your color perception skills? Let&apos;s go!</p>
           <Button 
             onClick={startGame} 
@@ -315,7 +313,7 @@ function GameComponent() {
           {!session && <p className="mt-6 text-sm text-gray-600">Sign in to save your scores and compete on the leaderboard!</p>}
         </div>
       ) : (
-        <div className="space-y-6 mt-12">
+        <div className="space-y-6 mt-16"> {/* Increased top margin */}
           <div className="h-12 flex items-center justify-center">
             <AnimatePresence>
               {showFeedback && (
