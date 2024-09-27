@@ -17,8 +17,14 @@ import ScoreDisplay from "./score-display"
 import { generateColors, calculateColorDifference } from "../lib/color-utils"
 import { PlayIcon, TrophyIcon } from "lucide-react"
 import type { GameState } from "../types"
-import { SignInButton } from './SignInButton'
 import { Leaderboard } from './Leaderboard'
+import { motion, AnimatePresence } from "framer-motion"
+import dynamic from 'next/dynamic'
+
+const SignInButton = dynamic(() => import('./SignInButton').then(mod => mod.SignInButton), {
+  loading: () => <Button disabled>Loading...</Button>,
+  ssr: false
+})
 
 function calculateDifficulty(level: number) {
   // Slower progression for color count
@@ -51,18 +57,27 @@ function GameComponent() {
   const [showTarget, setShowTarget] = useState(false)
   const [showLossDialog, setShowLossDialog] = useState(false)
   const [showLeaderboard, setShowLeaderboard] = useState(false)
+  const [consecutiveCorrect, setConsecutiveCorrect] = useState(0);
+  const [isNewHighScore, setIsNewHighScore] = useState(false);
+  const [feedbackText, setFeedbackText] = useState("")
+  const [showFeedback, setShowFeedback] = useState(false)
+  const [streak, setStreak] = useState(0)
 
   const endGame = useCallback(async (lost = false) => {
     setGameState(prev => {
-      const newHighScore = prev.score > prev.highScore ? prev.score : prev.highScore
-      if (newHighScore > prev.highScore) {
+      const newHighScore = prev.score > prev.highScore;
+      setIsNewHighScore(newHighScore);
+      const updatedHighScore = newHighScore ? prev.score : prev.highScore;
+      
+      if (newHighScore) {
         toast({
           title: "New High Score!",
-          description: `Congratulations! You've set a new high score of ${newHighScore} points!`,
-        })
+          description: `Congratulations! You've set a new high score of ${prev.score} points!`,
+        });
       }
-      return { ...prev, isPlaying: false, highScore: newHighScore }
-    })
+      
+      return { ...prev, isPlaying: false, highScore: updatedHighScore };
+    });
 
     if (session?.user) {
       try {
@@ -75,26 +90,26 @@ function GameComponent() {
             score: gameState.score,
             level: gameState.level,
           }),
-        })
+        });
 
         if (!response.ok) {
-          const errorData = await response.json()
-          throw new Error(errorData.message || 'Failed to save score')
+          const errorData = await response.json();
+          throw new Error(errorData.message || 'Failed to save score');
         }
 
-        const result = await response.json()
-        console.log(result.message)
+        const result = await response.json();
+        console.log(result.message);
       } catch (error) {
-        console.error('Error saving score:', error)
+        console.error('Error saving score:', error);
         toast({
           title: "Error",
           description: "Failed to save your score. Please try again.",
-        })
+        });
       }
     }
 
     if (lost) {
-      setShowLossDialog(true)
+      setShowLossDialog(true);
     }
   }, [session, gameState.score, gameState.level])
 
@@ -138,33 +153,53 @@ function GameComponent() {
   }
 
   function handleColorSelect(selectedColor: string) {
-    const difference = calculateColorDifference(gameState.targetColor, selectedColor)
+    const difference = calculateColorDifference(gameState.targetColor, selectedColor);
+    const timeBonus = Math.max(0, gameState.timeLeft / calculateDifficulty(gameState.level).selectionTime);
+    
     if (difference >= 0.1) {
-      endGame(true)
-      return
+      setFeedbackText("Almost right!")
+      setStreak(0)
+      endGame(true);
+      return;
     }
     
-    const points = Math.max(0, 100 - Math.round(difference * 1000))
+    const accuracyPoints = Math.max(0, 100 - Math.round(difference * 1000));
+    const speedPoints = Math.round(timeBonus * 50);
+    const bonusPoints = Math.min(50, consecutiveCorrect * 5);
+    const totalPoints = accuracyPoints + speedPoints + bonusPoints;
     
-    const newLevel = gameState.level + 1
-    const { colorCount, similarity, viewTime } = calculateDifficulty(newLevel)
-    const { target, options } = generateColors(colorCount, similarity)
+    setConsecutiveCorrect(prev => prev + 1);
+    setStreak(prev => prev + 1);
+    
+    // Set feedback text
+    const perfectGuess = difference < 0.01;
+    const feedbackOptions = perfectGuess 
+      ? ["Perfect!", "Excellent!", "Spot on!", "Brilliant!"]
+      : ["Correct!", "Nice job!", "Well done!", "Good eye!"];
+    setFeedbackText(feedbackOptions[Math.floor(Math.random() * feedbackOptions.length)]);
+    
+    setShowFeedback(true);
+    setTimeout(() => setShowFeedback(false), 1000);
+
+    const newLevel = gameState.level + 1;
+    const { colorCount, similarity, viewTime } = calculateDifficulty(newLevel);
+    const { target, options } = generateColors(colorCount, similarity);
     
     setGameState(prev => ({
       ...prev,
-      score: prev.score + points,
+      score: prev.score + totalPoints,
       level: newLevel,
       timeLeft: viewTime,
       targetColor: target,
       options: options
-    }))
+    }));
     
-    setShowTarget(true)
+    setShowTarget(true);
     
     toast({
       title: "Color Selected!",
-      description: `You earned ${points} points!`,
-    })
+      description: `You earned ${totalPoints} points! (Accuracy: ${accuracyPoints}, Speed: ${speedPoints}, Bonus: ${bonusPoints})`,
+    });
   }
 
   if (isLoading) {
@@ -172,66 +207,87 @@ function GameComponent() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 py-6 px-4 sm:py-12 sm:px-6 lg:px-8">
-      <div className="max-w-4xl mx-auto">
-        <div className="flex flex-col items-center mb-8">
-          <h1 className="text-4xl sm:text-5xl font-bold text-gray-900 mb-4">Color Memory Game</h1>
-          <div className="flex justify-center items-center space-x-4">
-            <Button onClick={() => setShowLeaderboard(true)} size="sm">
-              <TrophyIcon className="mr-2 h-4 w-4" /> Leaderboard
-            </Button>
-            <SignInButton />
-          </div>
-        </div>
-        
-        {!session ? (
-          <div className="text-center">
-            <p className="mb-6 text-lg sm:text-xl">Sign in to play and save your scores!</p>
-          </div>
-        ) : !gameState.isPlaying ? (
-          <div className="text-center">
-            <p className="mb-6 text-lg sm:text-xl">Test your color memory! Select the color you saw after it disappears.</p>
-            <Button onClick={startGame} size="lg" className="text-lg px-8 py-4">Start Game</Button>
-            {gameState.highScore > 0 && <p className="mt-6 text-xl">High Score: {gameState.highScore}</p>}
-          </div>
-        ) : (
-          <div className="space-y-8">
-            <ScoreDisplay gameState={gameState} />
-            <div className="flex justify-center">
-              {showTarget ? (
-                <ColorSwatch color={gameState.targetColor} size="large" className="w-64 h-64 sm:w-80 sm:h-80" />
-              ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 sm:gap-6">
-                  {gameState.options.map((color, index) => (
-                    <ColorSwatch
-                      key={index}
-                      color={color}
-                      onClick={() => handleColorSelect(color)}
-                      className="w-32 h-32 sm:w-40 sm:h-40"
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-            <Progress 
-              value={(gameState.timeLeft / calculateDifficulty(gameState.level)[showTarget ? 'viewTime' : 'selectionTime']) * 100} 
-              className="h-4 w-full"
-            />
-          </div>
-        )}
+    <div className="p-4 pb-6 relative">
+      <div className="absolute top-2 left-2">
+        <Button onClick={() => setShowLeaderboard(true)} size="default" className="h-10">
+          <TrophyIcon className="mr-2 h-5 w-5" /> Leaderboard
+        </Button>
       </div>
+      <div className="absolute top-2 right-2">
+        <SignInButton />
+      </div>
+      
+      {!gameState.isPlaying ? (
+        <div className="text-center mt-16">
+          <p className="mb-8 text-xl sm:text-2xl">Ready to test your color perception skills? Let&apos;s go!</p>
+          <Button 
+            onClick={startGame} 
+            size="lg" 
+            className="text-xl px-12 py-6 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700"
+          >
+            Start Game
+          </Button>
+          {!session && <p className="mt-6 text-sm text-gray-600">Sign in to save your scores and compete on the leaderboard!</p>}
+        </div>
+      ) : (
+        <div className="space-y-6 mt-12">
+          <div className="h-12 flex items-center justify-center">
+            <AnimatePresence>
+              {showFeedback && (
+                <motion.div
+                  initial={{ opacity: 0, y: -20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 20 }}
+                  className="text-2xl font-bold text-center text-green-500 absolute"
+                >
+                  {feedbackText}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+          <ScoreDisplay gameState={gameState} streak={streak} />
+          <div className="flex justify-center">
+            {showTarget ? (
+              <ColorSwatch color={gameState.targetColor} size="large" className="w-64 h-64 sm:w-80 sm:h-80" />
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 sm:gap-6">
+                {gameState.options.map((color, index) => (
+                  <ColorSwatch
+                    key={index}
+                    color={color}
+                    onClick={() => handleColorSelect(color)}
+                    className="w-32 h-32 sm:w-40 sm:h-40"
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+          <Progress 
+            value={(gameState.timeLeft / calculateDifficulty(gameState.level)[showTarget ? 'viewTime' : 'selectionTime']) * 100} 
+            className="h-4 w-full"
+          />
+        </div>
+      )}
       
       <Dialog open={showLossDialog} onOpenChange={setShowLossDialog}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
             <DialogTitle>Game Over!</DialogTitle>
             <DialogDescription>
-              You&apos;ve lost the game. Here&apos;s your final score:
+              {isNewHighScore 
+                ? "Congratulations! You've set a new high score!" 
+                : "Here's your final score:"}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
-            <p className="text-2xl font-bold text-center">Score: {gameState.score}</p>
+            <p className="text-2xl font-bold text-center">
+              {isNewHighScore ? "New High Score: " : "Your Score: "}
+              {gameState.score}
+            </p>
             <p className="text-xl text-center">Level: {gameState.level}</p>
+            {!isNewHighScore && (
+              <p className="text-lg text-center">Your Highest Score: {gameState.highScore}</p>
+            )}
           </div>
           <Button onClick={startGame} className="w-full">
             <PlayIcon className="mr-2 h-4 w-4" /> Play Again
@@ -240,11 +296,16 @@ function GameComponent() {
       </Dialog>
 
       <Dialog open={showLeaderboard} onOpenChange={setShowLeaderboard}>
-        <DialogContent className="sm:max-w-[600px]">
+        <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
             <DialogTitle>Leaderboard</DialogTitle>
+            <DialogDescription>
+              Here are the top scores:
+            </DialogDescription>
           </DialogHeader>
-          <Leaderboard />
+          <div className="grid gap-4 py-4">
+            <Leaderboard currentUserId={session?.user?.id} currentUserScore={gameState.highScore} />
+          </div>
         </DialogContent>
       </Dialog>
     </div>

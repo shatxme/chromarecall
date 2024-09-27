@@ -86,3 +86,6 @@ public/workbox-*.js
 
 #cursor rules
 .cursorrules
+
+#Specification
+SPEC.md

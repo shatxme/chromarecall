@@ -131,11 +131,85 @@ export function calculateColorDifference(color1: string, color2: string): number
   const rgb1 = hexToRgb(color1);
   const rgb2 = hexToRgb(color2);
   
-  const rDiff = Math.pow((rgb1.r - rgb2.r) / 255, 2);
-  const gDiff = Math.pow((rgb1.g - rgb2.g) / 255, 2);
-  const bDiff = Math.pow((rgb1.b - rgb2.b) / 255, 2);
+  // Using CIEDE2000 color difference formula for more accurate perception
+  const lab1 = rgb2lab(rgb1);
+  const lab2 = rgb2lab(rgb2);
   
-  return Math.sqrt(rDiff + gDiff + bDiff);
+  return deltaE(lab1, lab2) / 100; // Normalize to 0-1 range
+}
+
+// Add these helper functions for CIEDE2000 calculation
+function rgb2lab(rgb: {r: number, g: number, b: number}): [number, number, number] {
+  // Implementation of RGB to LAB conversion
+  let r = rgb.r / 255, g = rgb.g / 255, b = rgb.b / 255;
+
+  r = r > 0.04045 ? Math.pow((r + 0.055) / 1.055, 2.4) : r / 12.92;
+  g = g > 0.04045 ? Math.pow((g + 0.055) / 1.055, 2.4) : g / 12.92;
+  b = b > 0.04045 ? Math.pow((b + 0.055) / 1.055, 2.4) : b / 12.92;
+
+  let x = (r * 0.4124 + g * 0.3576 + b * 0.1805) / 0.95047;
+  let y = (r * 0.2126 + g * 0.7152 + b * 0.0722) / 1.00000;
+  let z = (r * 0.0193 + g * 0.1192 + b * 0.9505) / 1.08883;
+
+  x = x > 0.008856 ? Math.pow(x, 1/3) : (7.787 * x) + 16/116;
+  y = y > 0.008856 ? Math.pow(y, 1/3) : (7.787 * y) + 16/116;
+  z = z > 0.008856 ? Math.pow(z, 1/3) : (7.787 * z) + 16/116;
+
+  return [(116 * y) - 16, 500 * (x - y), 200 * (y - z)];
+}
+
+function deltaE(lab1: [number, number, number], lab2: [number, number, number]): number {
+  // Implementation of CIEDE2000 color difference formula
+  const [L1, a1, b1] = lab1;
+  const [L2, a2, b2] = lab2;
+
+  const kL = 1, kC = 1, kH = 1;
+
+  const C1 = Math.sqrt(a1 * a1 + b1 * b1);
+  const C2 = Math.sqrt(a2 * a2 + b2 * b2);
+
+  const aC1C2 = (C1 + C2) / 2.0;
+
+  const G = 0.5 * (1 - Math.sqrt(Math.pow(aC1C2, 7.0) / (Math.pow(aC1C2, 7.0) + Math.pow(25.0, 7.0))));
+
+  const a1p = (1.0 + G) * a1;
+  const a2p = (1.0 + G) * a2;
+
+  const C1p = Math.sqrt(a1p * a1p + b1 * b1);
+  const C2p = Math.sqrt(a2p * a2p + b2 * b2);
+
+  const h1p = Math.atan2(b1, a1p) + 2 * Math.PI * (Math.atan2(b1, a1p) < 0 ? 1 : 0);
+  const h2p = Math.atan2(b2, a2p) + 2 * Math.PI * (Math.atan2(b2, a2p) < 0 ? 1 : 0);
+
+  const dLp = L2 - L1;
+  const dCp = C2p - C1p;
+
+  const dhp = (C1p * C2p) === 0 ? 0 : (h2p - h1p + 360) % 360 - (Math.abs(h2p - h1p) > 180 ? 180 : 0);
+  const dHp = 2 * Math.sqrt(C1p * C2p) * Math.sin(dhp * Math.PI / 360);
+
+  const aL = (L1 + L2) / 2.0;
+  const aCp = (C1p + C2p) / 2.0;
+
+  const aHp = (C1p * C2p) === 0 ? h1p + h2p : (h1p + h2p + 360 * (Math.abs(h1p - h2p) > 180 ? 1 : 0)) / 2;
+
+  const T = 1 - 0.17 * Math.cos(aHp * Math.PI / 180 - Math.PI / 6) + 0.24 * Math.cos(2 * aHp * Math.PI / 180) + 0.32 * Math.cos(3 * aHp * Math.PI / 180 + Math.PI / 30) - 0.20 * Math.cos(4 * aHp * Math.PI / 180 - 7 * Math.PI / 20);
+
+  const dRo = 30 * Math.exp(-((aHp - 275) / 25) * ((aHp - 275) / 25));
+
+  const RC = 2 * Math.sqrt(Math.pow(aCp, 7) / (Math.pow(aCp, 7) + Math.pow(25, 7)));
+  const SL = 1 + ((0.015 * (aL - 50) * (aL - 50)) / Math.sqrt(20 + (aL - 50) * (aL - 50)));
+  const SC = 1 + 0.045 * aCp;
+  const SH = 1 + 0.015 * aCp * T;
+  const RT = -Math.sin(2 * dRo * Math.PI / 180) * RC;
+
+  const dE = Math.sqrt(
+    Math.pow(dLp / (SL * kL), 2) +
+    Math.pow(dCp / (SC * kC), 2) +
+    Math.pow(dHp / (SH * kH), 2) +
+    RT * (dCp / (SC * kC)) * (dHp / (SH * kH))
+  );
+
+  return dE;
 }
 
 function hexToRgb(hex: string): { r: number, g: number, b: number } {
@@ -158,4 +232,14 @@ function shuffleArray<T>(array: T[]): T[] {
 export function calculateTimeForLevel(level: number): number {
   // Start with 5 seconds, decrease by 1 second every 10 levels, minimum 1 second
   return Math.max(1, 5 - Math.floor(level / 10));
+}
+
+// Update the calculateDifficulty function
+export function calculateDifficulty(level: number) {
+  const colorCount = Math.min(8, 3 + Math.floor(level / 5)); // Max 8 colors, increase every 5 levels
+  const similarity = Math.min(0.95, 0.7 + (level * 0.01)); // Start at 0.7, increase by 0.01 per level, max 0.95
+  const viewTime = Math.max(2, 5 - Math.floor(level / 10)); // Start at 5s, decrease by 1s every 10 levels, min 2s
+  const selectionTime = Math.max(5, 15 - Math.floor(level / 5)); // Start at 15s, decrease by 1s every 5 levels, min 5s
+  
+  return { colorCount, similarity, viewTime, selectionTime };
 }

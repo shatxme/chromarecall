@@ -70,7 +70,9 @@ export const authOptions: NextAuthOptions = {
     async session({ session, token, user }) {
       console.log('Session callback:', { session, token, user })
       if (session?.user) {
-        session.user.id = token?.sub || user?.id || 'unknown'
+        session.user.id = token?.sub || user?.id || 'unknown';
+        // Use email username as display name
+        session.user.name = session.user.email?.split('@')[0] || 'Anonymous';
       }
       return session
     },
