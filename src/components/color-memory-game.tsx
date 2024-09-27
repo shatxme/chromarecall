@@ -264,7 +264,7 @@ function GameComponent() {
         <div className="flex justify-center gap-2 sm:gap-8 flex-wrap">
           {gameState.options.slice(0, firstRowColors).map((color, index) => (
             <ColorSwatch
-              key={`first-row-${index}`}
+              key={`${gameState.level}-${index}`}
               color={color}
               onClick={() => handleColorSelect(color)}
               className={`w-20 h-20 sm:w-36 sm:h-36 ${index >= 3 ? 'order-last sm:order-none' : ''}`}
@@ -275,7 +275,7 @@ function GameComponent() {
           <div className="flex justify-center gap-2 sm:gap-8 flex-wrap">
             {gameState.options.slice(5).map((color, index) => (
               <ColorSwatch
-                key={`second-row-${index}`}
+                key={`${gameState.level}-${index + 5}`}
                 color={color}
                 onClick={() => handleColorSelect(color)}
                 className="w-20 h-20 sm:w-36 sm:h-36"
@@ -300,9 +300,9 @@ function GameComponent() {
         <SignInButton />
       </div>
       
-      {!gameState.isPlaying ? (
-        <div className="text-center mt-12 sm:mt-16">
-          <p className="mb-4 sm:mb-6 text-base sm:text-lg md:text-xl">Ready to test your color perception skills?</p>
+      {!gameState.isPlaying && (
+        <div className="text-center mt-16 sm:mt-20">
+          <p className="mb-4 text-base sm:text-lg md:text-xl">Ready to test your color perception skills?</p>
           <Button 
             onClick={startGame} 
             size="lg" 
@@ -312,7 +312,9 @@ function GameComponent() {
           </Button>
           {!session && <p className="mt-2 sm:mt-4 text-xs sm:text-sm text-gray-600">Sign in to save your scores and compete on the leaderboard!</p>}
         </div>
-      ) : (
+      )}
+      
+      {gameState.isPlaying && (
         <div className="space-y-2 sm:space-y-4 mt-10 sm:mt-14">
           <div className="h-8 sm:h-10 md:h-12 flex items-center justify-center">
             <AnimatePresence>
@@ -329,7 +331,7 @@ function GameComponent() {
             </AnimatePresence>
           </div>
           <ScoreDisplay gameState={gameState} comboMultiplier={comboMultiplier} closeMatches={closeMatches} closeMatchLimit={gameState.level <= 50 ? 3 : 1} />
-          <div className="flex justify-center">
+          <div className="flex justify-center my-4 sm:my-0">
             {showTarget ? (
               <ColorSwatch color={gameState.targetColor} size="large" className="w-48 h-48 sm:w-72 sm:h-72" />
             ) : (
@@ -372,7 +374,7 @@ function GameComponent() {
       </Dialog>
 
       <Dialog open={showLeaderboard} onOpenChange={setShowLeaderboard}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-[425px] max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Leaderboard</DialogTitle>
             <DialogDescription>
