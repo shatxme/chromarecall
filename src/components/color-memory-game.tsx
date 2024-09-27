@@ -264,7 +264,7 @@ function GameComponent() {
         <div className="flex justify-center gap-2 sm:gap-8 flex-wrap">
           {gameState.options.slice(0, firstRowColors).map((color, index) => (
             <ColorSwatch
-              key={`${gameState.level}-${color}-${index}`}
+              key={`${color}-${index}`}
               color={color}
               onClick={() => handleColorSelect(color)}
               className={`w-[5.5rem] h-[5.5rem] sm:w-36 sm:h-36 ${index >= 3 ? 'order-last sm:order-none' : ''}`}
@@ -275,7 +275,7 @@ function GameComponent() {
           <div className="flex justify-center gap-2 sm:gap-8 flex-wrap">
             {gameState.options.slice(5).map((color, index) => (
               <ColorSwatch
-                key={`${gameState.level}-${color}-${index + 5}`}
+                key={`${color}-${index + 5}`}
                 color={color}
                 onClick={() => handleColorSelect(color)}
                 className="w-[5.5rem] h-[5.5rem] sm:w-36 sm:h-36"
