@@ -23,7 +23,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       // If no valid cache, fetch from database
       const leaderboard = await collection
         .find({}, { projection: { _id: 0, userId: 0, createdAt: 0 } })
-        .sort({ score: -1 }) // Ensure sorting by score in descending order
+        .hint({ score: -1 }) // Use the index we created
         .limit(10)
         .toArray();
 
@@ -64,9 +64,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       message: 'Error processing leaderboard request', 
       error: error instanceof Error ? error.message : String(error)
     });
-  } finally {
-    if (client) {
-      await client.close();
-    }
   }
 }
