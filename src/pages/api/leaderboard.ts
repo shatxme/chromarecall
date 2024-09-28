@@ -23,7 +23,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       // If no valid cache, fetch from database
       const leaderboard = await collection
         .find({}, { projection: { _id: 0, userId: 0, createdAt: 0 } })
-        .hint({ score: -1 })
+        .sort({ score: -1 }) // Ensure sorting by score in descending order
         .limit(10)
         .toArray();
 

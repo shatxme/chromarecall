@@ -34,16 +34,14 @@ export function Leaderboard({ currentUserId, currentUserScore }: LeaderboardProp
         // Calculate user's place if they have a score
         if (currentUserId && currentUserScore !== undefined) {
           const userEntry = data.find((entry: LeaderboardEntry) => entry.username === currentUserId)
-          if (userEntry) {
-            // Use the higher score between the current score and the leaderboard score
-            const scoreToUse = Math.max(userEntry.score, currentUserScore)
-            const place = data.filter((entry: LeaderboardEntry) => entry.score > scoreToUse).length + 1
-            setUserPlace(place)
-          } else {
-            // If user is not in leaderboard, calculate place based on currentUserScore
-            const place = data.filter((entry: LeaderboardEntry) => entry.score > currentUserScore).length + 1
-            setUserPlace(place)
-          }
+          const scoreToUse = Math.max(userEntry?.score || 0, currentUserScore)
+          
+          // Count how many scores are higher than the user's score
+          const higherScores = data.filter((entry: LeaderboardEntry) => entry.score > scoreToUse).length
+          
+          // User's place is the number of higher scores plus one
+          const place = higherScores + 1
+          setUserPlace(place)
         }
       } catch (error) {
         console.error('Error fetching leaderboard:', error)
