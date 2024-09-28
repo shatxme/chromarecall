@@ -95,6 +95,45 @@ export const authOptions: NextAuthOptions = {
     error: '/auth/error', // Keep this for error handling
   },
   debug: true,
+  logger: {
+    error(code, metadata) {
+      console.error(code, metadata)
+    },
+    warn(code) {
+      console.warn(code)
+    },
+    debug(code, metadata) {
+      console.debug(code, metadata)
+    }
+  },
+  cookies: {
+    sessionToken: {
+      name: `__Secure-next-auth.session-token`,
+      options: {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        secure: true
+      }
+    },
+    callbackUrl: {
+      name: `__Secure-next-auth.callback-url`,
+      options: {
+        sameSite: 'lax',
+        path: '/',
+        secure: true
+      }
+    },
+    csrfToken: {
+      name: `__Host-next-auth.csrf-token`,
+      options: {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        secure: true
+      }
+    },
+  },
 }
 
 export default NextAuth(authOptions)
