@@ -12,14 +12,14 @@ type LeaderboardEntry = {
 
 interface LeaderboardProps {
   currentUserId?: string
-  currentUserScore?: number
 }
 
-export function Leaderboard({ currentUserId, currentUserScore }: LeaderboardProps) {
+export function Leaderboard({ currentUserId }: LeaderboardProps) {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [userPlace, setUserPlace] = useState<number | null>(null)
+  const [userHighestScore, setUserHighestScore] = useState<number | null>(null)
 
   useEffect(() => {
     const fetchLeaderboard = async () => {
@@ -31,17 +31,17 @@ export function Leaderboard({ currentUserId, currentUserScore }: LeaderboardProp
         const data = await response.json()
         setLeaderboard(data)
 
-        // Calculate user's place if they have a score
         if (currentUserId) {
-          const userEntry = data.find((entry: LeaderboardEntry) => entry.username === currentUserId)
-          const userHighestScore = userEntry ? userEntry.score : 0
-          
-          // Count how many scores are higher than the user's highest score
-          const higherScores = data.filter((entry: LeaderboardEntry) => entry.score > userHighestScore).length
-          
-          // User's place is the number of higher scores plus one
-          const place = higherScores + 1
-          setUserPlace(place)
+          // Fetch the user's highest score
+          const userScoreResponse = await fetch(`/api/user-score?userId=${currentUserId}`)
+          if (userScoreResponse.ok) {
+            const { highestScore } = await userScoreResponse.json()
+            setUserHighestScore(highestScore)
+
+            // Calculate user's place
+            const higherScores = data.filter((entry: LeaderboardEntry) => entry.score > highestScore).length
+            setUserPlace(higherScores + 1)
+          }
         }
       } catch (error) {
         console.error('Error fetching leaderboard:', error)
@@ -52,7 +52,7 @@ export function Leaderboard({ currentUserId, currentUserScore }: LeaderboardProp
     }
 
     fetchLeaderboard()
-  }, [currentUserId, currentUserScore])
+  }, [currentUserId])
 
   if (isLoading) {
     return <div>Loading leaderboard...</div>
@@ -107,8 +107,9 @@ export function Leaderboard({ currentUserId, currentUserScore }: LeaderboardProp
           ))}
         </TableBody>
       </Table>
-      {userPlace && (
+      {userPlace && userHighestScore !== null && (
         <div className="mt-4 text-center">
+          <p className="font-semibold">Your Highest Score: {userHighestScore}</p>
           <p className="font-semibold">Your Place: {userPlace}</p>
         </div>
       )}
