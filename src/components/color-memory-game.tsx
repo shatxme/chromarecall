@@ -401,10 +401,7 @@ function GameComponent() {
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
-            <Leaderboard 
-              currentUserId={session?.user?.id} 
-              currentUserScore={Math.max(gameState.score, gameState.highScore)} 
-            />
+            <Leaderboard currentUserId={session?.user?.id} />
           </div>
         </DialogContent>
       </Dialog>

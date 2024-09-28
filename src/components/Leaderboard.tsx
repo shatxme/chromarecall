@@ -32,12 +32,12 @@ export function Leaderboard({ currentUserId, currentUserScore }: LeaderboardProp
         setLeaderboard(data)
 
         // Calculate user's place if they have a score
-        if (currentUserId && currentUserScore !== undefined) {
+        if (currentUserId) {
           const userEntry = data.find((entry: LeaderboardEntry) => entry.username === currentUserId)
-          const scoreToUse = Math.max(userEntry?.score || 0, currentUserScore)
+          const userHighestScore = userEntry ? userEntry.score : 0
           
-          // Count how many scores are higher than the user's score
-          const higherScores = data.filter((entry: LeaderboardEntry) => entry.score > scoreToUse).length
+          // Count how many scores are higher than the user's highest score
+          const higherScores = data.filter((entry: LeaderboardEntry) => entry.score > userHighestScore).length
           
           // User's place is the number of higher scores plus one
           const place = higherScores + 1
