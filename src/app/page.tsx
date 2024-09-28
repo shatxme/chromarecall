@@ -1,5 +1,10 @@
-import { ColorMemoryGame } from '@/components/color-memory-game'
+import dynamic from 'next/dynamic'
 import AnimatedHeader from '@/components/AnimatedHeader'
+
+const ColorMemoryGame = dynamic(() => import('@/components/color-memory-game').then(mod => mod.ColorMemoryGame), {
+  loading: () => <p>Loading game...</p>,
+  ssr: false
+})
 
 export default function Home() {
   return (

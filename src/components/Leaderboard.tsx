@@ -26,18 +26,26 @@ export function Leaderboard({ currentUserId, currentUserScore }: LeaderboardProp
       try {
         const response = await fetch('/api/leaderboard')
         if (!response.ok) {
-          const errorData = await response.json()
-          throw new Error(errorData.message || 'Failed to fetch leaderboard')
+          throw new Error('Failed to fetch leaderboard')
         }
         const data = await response.json()
         setLeaderboard(data)
 
         // Calculate user's place if they have a score
-        if (currentUserId && currentUserScore) {
-          const place = data.findIndex((entry: LeaderboardEntry) => entry.score <= currentUserScore) + 1
-          setUserPlace(place > 0 ? place : data.length + 1)
+        if (currentUserId && currentUserScore !== undefined) {
+          const userEntry = data.find((entry: LeaderboardEntry) => entry.username === currentUserId)
+          if (userEntry) {
+            // Use the higher score between the current score and the leaderboard score
+            const scoreToUse = Math.max(userEntry.score, currentUserScore)
+            const place = data.filter((entry: LeaderboardEntry) => entry.score > scoreToUse).length + 1
+            setUserPlace(place)
+          } else {
+            // If user is not in leaderboard, calculate place based on currentUserScore
+            const place = data.filter((entry: LeaderboardEntry) => entry.score > currentUserScore).length + 1
+            setUserPlace(place)
+          }
         }
-      } catch (error: unknown) {
+      } catch (error) {
         console.error('Error fetching leaderboard:', error)
         setError(error instanceof Error ? error.message : 'An unknown error occurred')
       } finally {

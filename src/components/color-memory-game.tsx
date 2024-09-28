@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect, useCallback } from "react"
+import React, { useState, useEffect, useCallback, useRef } from "react"
 import { SessionProvider, useSession } from 'next-auth/react'
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
@@ -12,15 +12,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import ColorSwatch from "./color-swatch"
-import ScoreDisplay from "./score-display"
-import { generateColors, calculateColorDifference } from "../lib/color-utils"
-import { PlayIcon, TrophyIcon } from "lucide-react"
-import type { GameState } from "../types"
-import { Leaderboard } from './Leaderboard'
-import { motion, AnimatePresence } from "framer-motion"
 import dynamic from 'next/dynamic'
+import { PlayIcon, TrophyIcon } from "lucide-react"
+import { motion, AnimatePresence } from "framer-motion"
+import type { GameState } from "../types"
+import { calculateColorDifference } from "../lib/color-utils"
 
+const ColorSwatch = dynamic(() => import('./color-swatch'))
+const ScoreDisplay = dynamic(() => import('./score-display'))
+const Leaderboard = dynamic(() => import('./Leaderboard').then(mod => mod.Leaderboard))
 const SignInButton = dynamic(() => import('./SignInButton').then(mod => mod.SignInButton), {
   loading: () => <Button disabled>Loading...</Button>,
   ssr: false
@@ -84,6 +84,24 @@ function GameComponent() {
   const [closeMatches, setCloseMatches] = useState(0);
   const [levelStarted, setLevelStarted] = useState(0);
   const [comboMultiplier, setComboMultiplier] = useState(1);
+
+  const workerRef = useRef<Worker | null>(null);
+
+  useEffect(() => {
+    workerRef.current = new Worker(new URL('../workers/colorWorker.ts', import.meta.url));
+    return () => workerRef.current?.terminate();
+  }, []);
+
+  const generateColorsWithWorker = useCallback((level: number, performanceRating: number) => {
+    return new Promise((resolve) => {
+      if (workerRef.current) {
+        workerRef.current.onmessage = (e: MessageEvent) => {
+          resolve(e.data);
+        };
+        workerRef.current.postMessage({ level, performanceRating });
+      }
+    });
+  }, []);
 
   const endGame = useCallback(async (lost = false) => {
     setGameState(prev => {
@@ -156,29 +174,28 @@ function GameComponent() {
     return () => clearInterval(timer)
   }, [gameState.isPlaying, gameState.timeLeft, showTarget, gameState.level, endGame, performanceRating])
 
-  function startGame() {
-    setIsLoading(true)
-    const { colorCount, similarity, viewTime } = calculateDifficulty(1, 1) // Start with neutral performance rating
-    const { target, options } = generateColors(colorCount, similarity)
+  const startGame = useCallback(async () => {
+    setIsLoading(true);
+    const colors = await generateColorsWithWorker(1, 1) as { target: string, options: string[] };
     setGameState(prev => ({
       ...prev,
       isPlaying: true,
       score: 0,
       level: 1,
-      timeLeft: viewTime,
-      targetColor: target,
-      options: options
-    }))
-    setShowTarget(true)
-    setIsLoading(false)
-    setShowLossDialog(false)
-    setComboMultiplier(1)
-    setCloseMatches(0)
-    setLevelStarted(0)
-    setPerformanceRating(1) // Reset performance rating when starting a new game
-  }
+      timeLeft: 3, // viewTime
+      targetColor: colors.target,
+      options: colors.options
+    }));
+    setShowTarget(true);
+    setIsLoading(false);
+    setShowLossDialog(false);
+    setComboMultiplier(1);
+    setCloseMatches(0);
+    setLevelStarted(0);
+    setPerformanceRating(1);
+  }, []);
 
-  const handleColorSelect = useCallback((selectedColor: string) => {
+  const handleColorSelect = useCallback(async (selectedColor: string) => {
     const difference = calculateColorDifference(gameState.targetColor, selectedColor);
     const { selectionTime } = calculateDifficulty(gameState.level, performanceRating);
     const timeBonus = Math.max(0, gameState.timeLeft / selectionTime);
@@ -234,16 +251,15 @@ function GameComponent() {
     setTimeout(() => setShowFeedback(false), 1000);
 
     const newLevel = gameState.level + 1;
-    const { colorCount, similarity, viewTime } = calculateDifficulty(newLevel, performanceRating);
-    const { target, options } = generateColors(colorCount, similarity);
+    const colors = await generateColorsWithWorker(newLevel, performanceRating) as { target: string, options: string[] };
     
     setGameState(prev => ({
       ...prev,
       score: prev.score + totalPoints,
       level: newLevel,
-      timeLeft: viewTime,
-      targetColor: target,
-      options: options
+      timeLeft: 3, // viewTime
+      targetColor: colors.target,
+      options: colors.options
     }));
     
     setShowTarget(true);
@@ -385,7 +401,10 @@ function GameComponent() {
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
-            <Leaderboard currentUserId={session?.user?.id} currentUserScore={gameState.highScore} />
+            <Leaderboard 
+              currentUserId={session?.user?.id} 
+              currentUserScore={Math.max(gameState.score, gameState.highScore)} 
+            />
           </div>
         </DialogContent>
       </Dialog>
