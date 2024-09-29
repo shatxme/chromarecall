@@ -14,8 +14,7 @@ let leaderboardCache: LeaderboardEntry[] | null = null;
 let lastCacheTime = 0;
 const CACHE_DURATION = 60000; // 1 minute
 
-export async function GET() {
-  // Remove the 'request' parameter if it's not used
+export async function GET(request: NextRequest) {
   let client: MongoClient | null = null;
   try {
     client = await clientPromise;
