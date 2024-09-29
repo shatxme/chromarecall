@@ -26,7 +26,7 @@ export function Leaderboard({ currentUserId }: LeaderboardProps) {
       try {
         const response = await fetch('/api/leaderboard')
         if (!response.ok) {
-          throw new Error('Failed to fetch leaderboard')
+          throw new Error(`Failed to fetch leaderboard: ${response.status} ${response.statusText}`)
         }
         const data = await response.json()
         setLeaderboard(data)

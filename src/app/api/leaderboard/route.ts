@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import clientPromise from '../../lib/mongodb';
+import clientPromise from '../../../lib/mongodb';
 import { MongoClient, WithId, Document } from 'mongodb';
 
 // Define the LeaderboardEntry type
@@ -14,7 +14,7 @@ let leaderboardCache: LeaderboardEntry[] | null = null;
 let lastCacheTime = 0;
 const CACHE_DURATION = 60000; // 1 minute
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   let client: MongoClient | null = null;
   try {
     client = await clientPromise;
