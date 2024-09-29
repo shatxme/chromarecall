@@ -104,11 +104,17 @@ function GameComponent() {
   const workerRef = useRef<Worker | null>(null);
 
   const fetchUserHighScore = async (userId: string) => {
+    if (!userId) {
+      console.log('No user ID available, skipping high score fetch')
+      return
+    }
     try {
       const response = await fetch(`/api/user-score?userId=${userId}`)
       if (response.ok) {
         const data = await response.json()
         setGameState(prev => ({ ...prev, highScore: data.highestScore }))
+      } else {
+        console.error('Failed to fetch user high score:', response.statusText)
       }
     } catch (error) {
       console.error('Error fetching user high score:', error)

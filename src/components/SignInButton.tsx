@@ -11,11 +11,9 @@ export function SignInButton() {
     if (status === 'loading') {
       update()
     }
-  }, [status, update])
-
-  useEffect(() => {
+    console.log('SignInButton: Session status:', status)
     console.log('SignInButton: Session data:', session)
-  }, [session])
+  }, [status, update, session])
 
   if (status === 'loading') {
     return <Button disabled size="sm" className="h-8 text-xs sm:text-sm sm:h-10">Loading...</Button>
@@ -31,7 +29,10 @@ export function SignInButton() {
 
   return (
     <Button 
-      onClick={() => signIn('google', { callbackUrl: '/' })}
+      onClick={() => {
+        console.log('Initiating sign in...')
+        signIn('google', { callbackUrl: window.location.origin })
+      }}
       size="sm" 
       className="h-8 text-xs sm:text-sm sm:h-10"
     >

@@ -32,7 +32,7 @@ export function Leaderboard({ currentUserId, currentScore, showOnlyUserStats = f
         }
         const data = await response.json()
         setLeaderboard(data)
-        console.log('Fetched leaderboard data:', data) // Add this line for debugging
+        console.log('Fetched leaderboard data:', data)
 
         if (currentUserId) {
           // Fetch the user's highest score and rank
@@ -85,14 +85,21 @@ export function Leaderboard({ currentUserId, currentScore, showOnlyUserStats = f
   }
 
   if (showOnlyUserStats) {
+    if (!currentUserId) {
+      return (
+        <div className="text-center">
+          <p className="font-semibold text-lg">Sign in to see your stats!</p>
+        </div>
+      )
+    }
     return (
       <div className="text-center">
-        <p className="font-semibold text-lg">Your All-Time Highest Score: {userHighestScore}</p>
-        <p className="font-semibold text-lg">Your Current Place: {userPlace}</p>
+        <p className="font-semibold text-lg">Your All-Time Highest Score: {userHighestScore || 'N/A'}</p>
+        <p className="font-semibold text-lg">Your Current Place: {userPlace || 'N/A'}</p>
         {currentScore !== undefined && (
           <p className="font-semibold text-lg">Your Current Score: {currentScore}</p>
         )}
-        {currentScore !== undefined && currentScore > (userHighestScore || 0) && (
+        {currentScore !== undefined && userHighestScore !== null && currentScore > userHighestScore && (
           <p className="font-semibold text-lg text-green-600">New Personal Best!</p>
         )}
       </div>
