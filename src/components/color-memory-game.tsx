@@ -90,7 +90,24 @@ function GameComponent() {
   useEffect(() => {
     console.log('Session in GameComponent:', session)
     console.log('Session status in GameComponent:', status)
+
+    if (status === 'authenticated' && session?.user?.id) {
+      // Fetch user's high score or perform any other authenticated actions
+      fetchUserHighScore(session.user.id)
+    }
   }, [session, status])
+
+  const fetchUserHighScore = async (userId: string) => {
+    try {
+      const response = await fetch(`/api/user-score?userId=${userId}`)
+      if (response.ok) {
+        const data = await response.json()
+        setGameState(prev => ({ ...prev, highScore: data.highestScore }))
+      }
+    } catch (error) {
+      console.error('Error fetching user high score:', error)
+    }
+  }
 
   useEffect(() => {
     workerRef.current = new Worker(new URL('../workers/colorWorker.ts', import.meta.url));
@@ -124,7 +141,7 @@ function GameComponent() {
       return { ...prev, isPlaying: false, highScore: updatedHighScore };
     });
 
-    if (session?.user) {
+    if (session?.user?.id) {
       try {
         const response = await fetch('/api/leaderboard', {
           method: 'POST',
@@ -441,6 +458,12 @@ function GameComponent() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {status === 'authenticated' && session?.user?.name ? (
+        <p>Welcome, {session.user.name}!</p>
+      ) : status === 'loading' ? (
+        <p>Loading session...</p>
+      ) : null}
     </div>
   )
 }

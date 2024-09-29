@@ -10,10 +10,12 @@ export function SignInButton() {
 
   useEffect(() => {
     setIsClient(true)
-  }, [])
+    console.log('SignInButton: Session status changed:', status)
+    console.log('SignInButton: Session data:', session)
+  }, [session, status])
 
   if (!isClient) {
-    return null // or a loading state
+    return null
   }
 
   if (status === 'loading') {

@@ -9,7 +9,6 @@ interface LeaderboardEntry {
   level: number;
 }
 
-// Replace 'any' with a more specific type
 let leaderboardCache: LeaderboardEntry[] | null = null;
 let lastCacheTime = 0;
 const CACHE_DURATION = 60000; // 1 minute
@@ -22,20 +21,18 @@ export async function GET() {
     const collection = db.collection("scores");
 
     // Check if we have a valid cache
-    if (leaderboardCache) {
-      // Return cached data immediately
+    if (leaderboardCache && Date.now() - lastCacheTime < CACHE_DURATION) {
       return NextResponse.json(leaderboardCache);
-
-      // Check if cache is stale
-      if (Date.now() - lastCacheTime >= CACHE_DURATION) {
-        // Fetch new data in the background
-        updateLeaderboardCache(collection);
-      }
-    } else {
-      // If no cache, fetch from database
-      const leaderboard = await fetchLeaderboard(collection);
-      return NextResponse.json(leaderboard);
     }
+
+    // If no cache or cache is stale, fetch from database
+    const leaderboard = await fetchLeaderboard(collection);
+    
+    // Update cache
+    leaderboardCache = leaderboard;
+    lastCacheTime = Date.now();
+
+    return NextResponse.json(leaderboard);
   } catch (error: unknown) {
     return NextResponse.json({ 
       message: 'Error processing leaderboard request', 
@@ -44,36 +41,21 @@ export async function GET() {
   }
 }
 
-async function fetchLeaderboard(collection: Collection<Document>) {
+async function fetchLeaderboard(collection: Collection<Document>): Promise<LeaderboardEntry[]> {
   const leaderboardData = await collection
-    .aggregate([
-      {
-        $group: {
-          _id: "$userId",
-          username: { $first: "$username" },
-          score: { $max: "$score" },
-          level: { $max: "$level" }
-        }
-      },
-      { $sort: { score: -1 } },
-      { $limit: 10 }, // Ensure this is set to 10
-      { $project: { _id: 0, userId: 0 } }
-    ])
+    .find({})
+    .sort({ score: -1 })
+    .limit(10)
+    .project({ _id: 0, userId: 0, createdAt: 0 })
     .toArray();
 
-  console.log('Fetched leaderboard data:', leaderboardData); // Add this line for debugging
+  console.log('Fetched leaderboard data:', leaderboardData);
 
   return leaderboardData.map((entry: Document) => ({
     username: entry.username as string,
     score: entry.score as number,
     level: entry.level as number
   }));
-}
-
-async function updateLeaderboardCache(collection: Collection<Document>) {
-  const leaderboard = await fetchLeaderboard(collection);
-  leaderboardCache = leaderboard;
-  lastCacheTime = Date.now();
 }
 
 export async function POST(request: NextRequest) {
@@ -96,6 +78,10 @@ export async function POST(request: NextRequest) {
     // Invalidate cache on new score
     leaderboardCache = null;
 
+    // Calculate the user's rank based on their score
+    const rank = await collection.countDocuments({ score: { $gt: score } }) + 1;
+    const isTopTen = rank <= 10;
+
     // Get the user's highest score
     const userHighestScore = await collection
       .find({ userId: userId })
@@ -105,15 +91,11 @@ export async function POST(request: NextRequest) {
 
     const highestScore = userHighestScore.length > 0 ? userHighestScore[0].score : score;
 
-    // Calculate the user's rank based on their highest score
-    const rank = await collection.countDocuments({ score: { $gt: highestScore } });
-    const isTopTen = rank < 10;
-
     return NextResponse.json({ 
       message: "Score saved successfully", 
       highestScore: highestScore,
       isTopTen,
-      rank: rank + 1
+      rank: rank
     }, { status: 201 });
   } catch (error: unknown) {
     return NextResponse.json({ 
