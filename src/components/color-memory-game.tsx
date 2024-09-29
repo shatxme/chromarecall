@@ -62,7 +62,7 @@ function calculateDifficulty(level: number, performanceRating: number) {
 }
 
 function GameComponent() {
-  const { data: session } = useSession()
+  const { data: session, status } = useSession()
   const [gameState, setGameState] = useState<GameState>({
     targetColor: '',
     options: [],
@@ -86,6 +86,11 @@ function GameComponent() {
   const [comboMultiplier, setComboMultiplier] = useState(1);
 
   const workerRef = useRef<Worker | null>(null);
+
+  useEffect(() => {
+    console.log('Session in GameComponent:', session)
+    console.log('Session status in GameComponent:', status)
+  }, [session, status])
 
   useEffect(() => {
     workerRef.current = new Worker(new URL('../workers/colorWorker.ts', import.meta.url));

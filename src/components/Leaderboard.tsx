@@ -32,6 +32,7 @@ export function Leaderboard({ currentUserId, currentScore, showOnlyUserStats = f
         }
         const data = await response.json()
         setLeaderboard(data)
+        console.log('Fetched leaderboard data:', data) // Add this line for debugging
 
         if (currentUserId) {
           // Fetch the user's highest score and rank

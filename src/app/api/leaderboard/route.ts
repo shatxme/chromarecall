@@ -61,6 +61,8 @@ async function fetchLeaderboard(collection: Collection<Document>) {
     ])
     .toArray();
 
+  console.log('Fetched leaderboard data:', leaderboardData); // Add this line for debugging
+
   return leaderboardData.map((entry: Document) => ({
     username: entry.username as string,
     score: entry.score as number,
