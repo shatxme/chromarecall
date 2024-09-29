@@ -12,9 +12,11 @@ type LeaderboardEntry = {
 
 interface LeaderboardProps {
   currentUserId?: string
+  currentScore?: number
+  showOnlyUserStats?: boolean
 }
 
-export function Leaderboard({ currentUserId }: LeaderboardProps) {
+export function Leaderboard({ currentUserId, currentScore, showOnlyUserStats = false }: LeaderboardProps) {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -32,15 +34,16 @@ export function Leaderboard({ currentUserId }: LeaderboardProps) {
         setLeaderboard(data)
 
         if (currentUserId) {
-          // Fetch the user's highest score
-          const userScoreResponse = await fetch(`/api/user-score?userId=${currentUserId}`)
+          // Fetch the user's highest score and rank
+          const userScoreResponse = await fetch(`/api/leaderboard`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: currentUserId, score: currentScore || 0 })
+          })
           if (userScoreResponse.ok) {
-            const { highestScore } = await userScoreResponse.json()
+            const { highestScore, rank } = await userScoreResponse.json()
             setUserHighestScore(highestScore)
-
-            // Calculate user's place
-            const higherScores = data.filter((entry: LeaderboardEntry) => entry.score > highestScore).length
-            setUserPlace(higherScores + 1)
+            setUserPlace(rank)
           }
         }
       } catch (error) {
@@ -52,7 +55,7 @@ export function Leaderboard({ currentUserId }: LeaderboardProps) {
     }
 
     fetchLeaderboard()
-  }, [currentUserId])
+  }, [currentUserId, currentScore])
 
   if (isLoading) {
     return <div>Loading leaderboard...</div>
@@ -78,6 +81,21 @@ export function Leaderboard({ currentUserId }: LeaderboardProps) {
       case 2: return <Trophy className="w-5 h-5 text-orange-500" />;
       default: return null;
     }
+  }
+
+  if (showOnlyUserStats) {
+    return (
+      <div className="text-center">
+        <p className="font-semibold text-lg">Your All-Time Highest Score: {userHighestScore}</p>
+        <p className="font-semibold text-lg">Your Current Place: {userPlace}</p>
+        {currentScore !== undefined && (
+          <p className="font-semibold text-lg">Your Current Score: {currentScore}</p>
+        )}
+        {currentScore !== undefined && currentScore > (userHighestScore || 0) && (
+          <p className="font-semibold text-lg text-green-600">New Personal Best!</p>
+        )}
+      </div>
+    )
   }
 
   return (
@@ -111,8 +129,8 @@ export function Leaderboard({ currentUserId }: LeaderboardProps) {
       </div>
       {userPlace && userHighestScore !== null && (
         <div className="mt-4 text-center">
-          <p className="font-semibold">Your Highest Score: {userHighestScore}</p>
-          <p className="font-semibold">Your Place: {userPlace}</p>
+          <p className="font-semibold">Your All-Time Highest Score: {userHighestScore}</p>
+          <p className="font-semibold">Your Current Place: {userPlace}</p>
         </div>
       )}
     </div>

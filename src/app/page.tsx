@@ -1,5 +1,8 @@
+'use client'
+
 import dynamic from 'next/dynamic'
 import AnimatedHeader from '@/components/AnimatedHeader'
+import { useState, useEffect } from 'react'
 
 const ColorMemoryGame = dynamic(() => import('@/components/color-memory-game').then(mod => mod.ColorMemoryGame), {
   loading: () => <p>Loading game...</p>,
@@ -7,8 +10,17 @@ const ColorMemoryGame = dynamic(() => import('@/components/color-memory-game').t
 })
 
 export default function Home() {
-  console.log('GOOGLE_ID:', process.env.GOOGLE_ID);
-  console.log('GOOGLE_SECRET:', process.env.GOOGLE_SECRET ? 'Set' : 'Not set');
+  const [isClient, setIsClient] = useState(false)
+
+  useEffect(() => {
+    setIsClient(true)
+    // Preload the game component
+    import('@/components/color-memory-game')
+  }, [])
+
+  if (!isClient) {
+    return null // or a loading indicator
+  }
   
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-400 via-pink-500 to-red-500">

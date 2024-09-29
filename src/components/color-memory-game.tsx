@@ -13,7 +13,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import dynamic from 'next/dynamic'
-import { PlayIcon, TrophyIcon, Crown } from "lucide-react"
+import { PlayIcon, Crown } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import type { GameState } from "../types"
 import { calculateColorDifference } from "../lib/color-utils"
@@ -126,7 +126,7 @@ function GameComponent() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             userId: session.user.id,
-            username: session.user.name || 'Anonymous', // Use name instead of username
+            username: session.user.name || 'Anonymous',
             score: gameState.score,
             level: gameState.level,
           }),
@@ -138,9 +138,13 @@ function GameComponent() {
         }
 
         const result = await response.json();
-        console.log(result.message);
+        // Update the game state with the new highest score and rank
+        setGameState(prev => ({
+          ...prev,
+          highScore: result.highestScore,
+          rank: result.rank
+        }));
       } catch (error) {
-        console.error('Error saving score:', error);
         toast({
           title: "Error",
           description: "Failed to save your score. Please try again.",
@@ -390,26 +394,32 @@ function GameComponent() {
       <Dialog open={showLossDialog} onOpenChange={setShowLossDialog}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
-            <DialogTitle>Game Over!</DialogTitle>
+            <DialogTitle className="text-2xl font-bold text-yellow-600">Game Over!</DialogTitle>
             <DialogDescription>
               {isNewHighScore 
-                ? "Congratulations! You've set a new high score!" 
-                : "Here's your final score:"}
+                ? "Congratulations! You've set a new personal best!" 
+                : "Great effort! Here's how you did:"}
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <p className="text-2xl font-bold text-center">
-              {isNewHighScore ? "New High Score: " : "Your Score: "}
-              {gameState.score}
+              Your Score: {gameState.score}
             </p>
-            <p className="text-xl text-center">Level: {gameState.level}</p>
-            {!isNewHighScore && (
-              <p className="text-lg text-center">Your Highest Score: {gameState.highScore}</p>
-            )}
+            <p className="text-xl text-center">Level Reached: {gameState.level}</p>
+            <Leaderboard 
+              currentUserId={session?.user?.id} 
+              currentScore={gameState.score} 
+              showOnlyUserStats={true} 
+            />
           </div>
-          <Button onClick={startGame} className="w-full">
-            <PlayIcon className="mr-2 h-4 w-4" /> Play Again
-          </Button>
+          <div className="flex flex-col gap-4">
+            <Button onClick={startGame} className="w-full bg-green-500 hover:bg-green-600">
+              <PlayIcon className="mr-2 h-4 w-4" /> Play Again
+            </Button>
+            <Button onClick={() => setShowLeaderboard(true)} className="w-full bg-yellow-500 hover:bg-yellow-600">
+              <Crown className="mr-2 h-4 w-4" /> View Champions
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
 
