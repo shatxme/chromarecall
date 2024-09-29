@@ -57,7 +57,7 @@ function calculateDifficulty(level: number, performanceRating: number) {
   return { colorCount, similarity, viewTime, selectionTime };
 }
 
-function GameComponent() {
+export function ColorMemoryGame() {
   const [localUserData, setLocalUserData] = useState<LocalUserData | null>(null)
   const [showUsernameInput, setShowUsernameInput] = useState(false)
   const [tempUsername, setTempUsername] = useState('')
@@ -150,7 +150,7 @@ function GameComponent() {
 
     if (!localUserData) {
       setShowUsernameInput(true)
-    } else if (gameState.score > localUserData.highestScore) {
+    } else if (gameState.score > (localUserData.highestScore || 0)) {
       saveUserData(localUserData.username, gameState.score)
     }
 
@@ -178,7 +178,7 @@ function GameComponent() {
         rank: result.rank
       }));
     } catch (error) {
-      toast({
+      memoizedToast({
         title: "Error",
         description: "Failed to save your score. Please try again.",
       });
@@ -379,9 +379,6 @@ function GameComponent() {
             >
               Start Game
             </Button>
-            <p className="text-xs sm:text-sm text-gray-600">
-              Sign in to save your scores and compete to become a color champion!
-            </p>
           </div>
         </div>
       )}
@@ -434,7 +431,7 @@ function GameComponent() {
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <p className="text-2xl font-bold text-center">
-              Your Score: {gameState.score}
+              Score: {gameState.score}
             </p>
             <p className="text-xl text-center">Level Reached: {gameState.level}</p>
             <Leaderboard 
@@ -442,7 +439,7 @@ function GameComponent() {
               currentScore={gameState.score} 
               showOnlyUserStats={true} 
             />
-            {!localUserData && (
+            {showUsernameInput && (
               <div>
                 <p className="text-sm text-gray-600 mb-2">Enter a username to save your score:</p>
                 <Input
@@ -455,7 +452,7 @@ function GameComponent() {
             )}
           </div>
           <div className="flex flex-col gap-4">
-            {!localUserData ? (
+            {showUsernameInput ? (
               <Button onClick={handleUsernameSubmit} disabled={!tempUsername.trim()}>
                 Save Score and Play Again
               </Button>
@@ -480,16 +477,10 @@ function GameComponent() {
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
-            <Leaderboard localUserData={localUserData} />
+            <Leaderboard localUserData={localUserData} currentScore={gameState.score} />
           </div>
         </DialogContent>
       </Dialog>
     </div>
-  )
-}
-
-export function ColorMemoryGame() {
-  return (
-    <GameComponent />
   )
 }
