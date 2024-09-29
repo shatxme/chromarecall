@@ -62,7 +62,23 @@ function calculateDifficulty(level: number, performanceRating: number) {
 }
 
 function GameComponent() {
-  const { data: session, status } = useSession()
+  const { data: session, status, update } = useSession()
+  
+  useEffect(() => {
+    if (status === 'loading') {
+      update()
+    }
+  }, [status, update])
+
+  useEffect(() => {
+    console.log('Session in GameComponent:', session)
+    console.log('Session status in GameComponent:', status)
+
+    if (status === 'authenticated' && session?.user?.id) {
+      fetchUserHighScore(session.user.id)
+    }
+  }, [session, status])
+
   const [gameState, setGameState] = useState<GameState>({
     targetColor: '',
     options: [],
@@ -86,15 +102,6 @@ function GameComponent() {
   const [comboMultiplier, setComboMultiplier] = useState(1);
 
   const workerRef = useRef<Worker | null>(null);
-
-  useEffect(() => {
-    console.log('Session in GameComponent:', session)
-    console.log('Session status in GameComponent:', status)
-
-    if (status === 'authenticated' && session?.user?.id) {
-      fetchUserHighScore(session.user.id)
-    }
-  }, [session, status])
 
   const fetchUserHighScore = async (userId: string) => {
     try {

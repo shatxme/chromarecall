@@ -2,21 +2,20 @@
 
 import { signIn, signOut, useSession } from 'next-auth/react'
 import { Button } from "@/components/ui/button"
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 
 export function SignInButton() {
-  const { data: session, status } = useSession()
-  const [isClient, setIsClient] = useState(false)
+  const { data: session, status, update } = useSession()
 
   useEffect(() => {
-    setIsClient(true)
-    console.log('SignInButton: Session status changed:', status)
-    console.log('SignInButton: Session data:', session)
-  }, [session, status])
+    if (status === 'loading') {
+      update()
+    }
+  }, [status, update])
 
-  if (!isClient) {
-    return null
-  }
+  useEffect(() => {
+    console.log('SignInButton: Session data:', session)
+  }, [session])
 
   if (status === 'loading') {
     return <Button disabled size="sm" className="h-8 text-xs sm:text-sm sm:h-10">Loading...</Button>
