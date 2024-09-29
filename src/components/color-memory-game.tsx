@@ -317,16 +317,33 @@ function GameComponent() {
       </div>
       
       {!gameState.isPlaying && (
-        <div className="text-center mt-20 sm:mt-24">
-          <p className="mb-6 text-base sm:text-lg md:text-xl">Ready to test your color perception skills?</p>
-          <Button 
-            onClick={startGame} 
-            size="lg" 
-            className="text-base sm:text-lg px-6 py-3 sm:px-8 sm:py-4 md:text-xl md:px-12 md:py-6 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700"
-          >
-            Start Game
-          </Button>
-          {!session && <p className="mt-4 sm:mt-6 text-xs sm:text-sm text-gray-600">Sign in to save your scores and compete on the leaderboard!</p>}
+        <div className="text-center mt-16 sm:mt-20 max-w-2xl mx-auto">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4 text-gray-800">
+            Ready to test your color perception skills?
+          </h2>
+          <div className="bg-white bg-opacity-80 p-4 sm:p-6 rounded-lg shadow-md mb-6">
+            <p className="text-sm sm:text-base md:text-lg text-gray-700 leading-relaxed text-center mb-2">
+              Here's how to play:
+            </p>
+            <ul className="text-sm sm:text-base md:text-lg text-gray-700 list-disc list-inside mt-2 space-y-2 text-left">
+              <li>A color will appear briefly</li>
+              <li>Memorize it, then choose the matching color from the options</li>
+              <li>You can pick close matches, but you're limited to 3 in early levels</li>
+              <li>Be quick and accurate to score high!</li>
+            </ul>
+          </div>
+          <div className="space-y-2">
+            <Button 
+              onClick={startGame} 
+              size="lg" 
+              className="text-base sm:text-lg px-6 py-3 sm:px-8 sm:py-4 md:text-xl md:px-12 md:py-6 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700"
+            >
+              Start Game
+            </Button>
+            <p className="text-xs sm:text-sm text-gray-600">
+              Sign in to save your scores and compete on the leaderboard!
+            </p>
+          </div>
         </div>
       )}
       
