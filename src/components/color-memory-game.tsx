@@ -193,7 +193,7 @@ function GameComponent() {
     setCloseMatches(0);
     setLevelStarted(0);
     setPerformanceRating(1);
-  }, []);
+  }, [generateColorsWithWorker]);
 
   const handleColorSelect = useCallback(async (selectedColor: string) => {
     const difference = calculateColorDifference(gameState.targetColor, selectedColor);
@@ -268,7 +268,7 @@ function GameComponent() {
       title: "Color Selected!",
       description: `You earned ${totalPoints} points! (Accuracy: ${accuracyPoints}, Speed: ${speedPoints}${newComboMultiplier > 1 ? `, Combo: ${newComboMultiplier.toFixed(1)}x` : ''})`,
     });
-  }, [gameState, performanceRating, levelStarted, closeMatches, comboMultiplier, endGame, setExactMatch, setLevelStarted, setCloseMatches, setPerformanceRating, setComboMultiplier, setFeedbackText, setShowFeedback, setGameState, setShowTarget]);
+  }, [gameState, performanceRating, levelStarted, closeMatches, comboMultiplier, endGame, setExactMatch, setLevelStarted, setCloseMatches, setPerformanceRating, setComboMultiplier, setFeedbackText, setShowFeedback, setGameState, setShowTarget, generateColorsWithWorker]);
 
   const renderColorSwatches = useCallback(() => {
     const totalColors = gameState.options.length;

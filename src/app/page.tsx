@@ -7,6 +7,9 @@ const ColorMemoryGame = dynamic(() => import('@/components/color-memory-game').t
 })
 
 export default function Home() {
+  console.log('GOOGLE_ID:', process.env.GOOGLE_ID);
+  console.log('GOOGLE_SECRET:', process.env.GOOGLE_SECRET ? 'Set' : 'Not set');
+  
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-400 via-pink-500 to-red-500">
       <div className="container mx-auto px-4 py-8 sm:py-16">
