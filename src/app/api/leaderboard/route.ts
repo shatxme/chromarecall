@@ -24,7 +24,7 @@ export async function GET() {
     // Check if we have a valid cache
     if (leaderboardCache) {
       // Return cached data immediately
-      NextResponse.json(leaderboardCache);
+      return NextResponse.json(leaderboardCache);
 
       // Check if cache is stale
       if (Date.now() - lastCacheTime >= CACHE_DURATION) {
@@ -56,7 +56,7 @@ async function fetchLeaderboard(collection: Collection<Document>) {
         }
       },
       { $sort: { score: -1 } },
-      { $limit: 10 },
+      { $limit: 10 }, // Ensure this is set to 10
       { $project: { _id: 0, userId: 0 } }
     ])
     .toArray();
