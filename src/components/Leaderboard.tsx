@@ -81,38 +81,40 @@ export function Leaderboard({ currentUserId }: LeaderboardProps) {
   }
 
   return (
-    <>
-      <Table className="w-full">
-        <TableHeader>
-          <TableRow>
-            <TableHead className="w-[60px] sm:w-[100px]">Rank</TableHead>
-            <TableHead>Username</TableHead>
-            <TableHead className="text-right">Score</TableHead>
-            <TableHead className="text-right">Level</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {leaderboard.map((entry, index) => (
-            <TableRow key={index} className={getRankStyle(index)}>
-              <TableCell className="font-medium">
-                <div className="flex items-center space-x-2">
-                  {getRankIcon(index)}
-                  <span>{index + 1}</span>
-                </div>
-              </TableCell>
-              <TableCell>{entry.username}</TableCell>
-              <TableCell className="text-right">{entry.score}</TableCell>
-              <TableCell className="text-right">{entry.level}</TableCell>
+    <div className="overflow-x-hidden">
+      <div className="overflow-x-auto max-w-full">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-[60px] sm:w-[100px]">Rank</TableHead>
+              <TableHead>Username</TableHead>
+              <TableHead className="text-right">Score</TableHead>
+              <TableHead className="text-right">Level</TableHead>
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+          </TableHeader>
+          <TableBody>
+            {leaderboard.map((entry, index) => (
+              <TableRow key={index} className={getRankStyle(index)}>
+                <TableCell className="font-medium">
+                  <div className="flex items-center space-x-2">
+                    {getRankIcon(index)}
+                    <span>{index + 1}</span>
+                  </div>
+                </TableCell>
+                <TableCell>{entry.username}</TableCell>
+                <TableCell className="text-right">{entry.score}</TableCell>
+                <TableCell className="text-right">{entry.level}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
       {userPlace && userHighestScore !== null && (
         <div className="mt-4 text-center">
           <p className="font-semibold">Your Highest Score: {userHighestScore}</p>
           <p className="font-semibold">Your Place: {userPlace}</p>
         </div>
       )}
-    </>
+    </div>
   )
 }

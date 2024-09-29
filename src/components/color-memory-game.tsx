@@ -13,7 +13,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import dynamic from 'next/dynamic'
-import { PlayIcon, TrophyIcon } from "lucide-react"
+import { PlayIcon, TrophyIcon, Crown } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import type { GameState } from "../types"
 import { calculateColorDifference } from "../lib/color-utils"
@@ -310,8 +310,12 @@ function GameComponent() {
   return (
     <div className="p-2 sm:p-4 pb-4 sm:pb-6 relative">
       <div className="absolute top-2 sm:top-4 left-2 sm:left-4 right-2 sm:right-4 flex justify-between items-center">
-        <Button onClick={() => setShowLeaderboard(true)} size="sm" className="h-8 text-xs sm:text-sm sm:h-10">
-          <TrophyIcon className="mr-1 h-4 w-4" /> Leaderboard
+        <Button 
+          onClick={() => setShowLeaderboard(true)} 
+          size="sm" 
+          className="h-8 text-xs sm:text-sm sm:h-10 bg-gradient-to-r from-yellow-400 to-yellow-600 hover:from-yellow-500 hover:to-yellow-700 text-white font-bold transition-all duration-300 transform hover:scale-105 shadow-md hover:shadow-lg"
+        >
+          <Crown className="mr-1 h-4 w-4" /> Champions
         </Button>
         <SignInButton />
       </div>
@@ -341,7 +345,7 @@ function GameComponent() {
               Start Game
             </Button>
             <p className="text-xs sm:text-sm text-gray-600">
-              Sign in to save your scores and compete on the leaderboard!
+              Sign in to save your scores and compete to become a color champion!
             </p>
           </div>
         </div>
@@ -410,14 +414,14 @@ function GameComponent() {
       </Dialog>
 
       <Dialog open={showLeaderboard} onOpenChange={setShowLeaderboard}>
-        <DialogContent className="sm:max-w-[425px] max-h-[80vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-[425px] max-h-[80vh] overflow-y-auto overflow-x-hidden">
           <DialogHeader>
-            <DialogTitle>Leaderboard</DialogTitle>
-            <DialogDescription>
-              Here are the top scores:
+            <DialogTitle className="text-2xl font-bold text-yellow-600">Champions</DialogTitle>
+            <DialogDescription className="text-gray-600">
+              Behold the top color masters:
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
+          <div className="py-4">
             <Leaderboard currentUserId={session?.user?.id} />
           </div>
         </DialogContent>
