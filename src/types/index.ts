@@ -14,3 +14,11 @@ export interface LocalUserData {
   username: string;
   highestScore: number;
 }
+
+export type LeaderboardEntry = {
+  username: string
+  score: number
+  level: number
+}
+
+// Add any other types that might be used across multiple components

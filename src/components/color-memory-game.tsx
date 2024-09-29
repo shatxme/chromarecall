@@ -13,7 +13,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import dynamic from 'next/dynamic'
-import { PlayIcon, Crown } from "lucide-react"
+import { Crown } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import type { GameState, LocalUserData } from "../types"
 import { calculateColorDifference } from "../lib/color-utils"
