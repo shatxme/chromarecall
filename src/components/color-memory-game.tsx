@@ -271,7 +271,7 @@ function GameComponent() {
   }, [gameState, performanceRating, levelStarted, closeMatches, comboMultiplier, endGame, setExactMatch, setLevelStarted, setCloseMatches, setPerformanceRating, setComboMultiplier, setFeedbackText, setShowFeedback, setGameState, setShowTarget, generateColorsWithWorker]);
 
   const renderColorSwatches = useCallback(() => {
-    const totalColors = gameState.options.length;
+    const totalColors = Math.min(9, gameState.options.length);
     const firstRowColors = Math.min(5, totalColors);
     const secondRowColors = Math.max(0, totalColors - 5);
 
@@ -289,7 +289,7 @@ function GameComponent() {
         </div>
         {secondRowColors > 0 && (
           <div className="flex justify-center gap-2 sm:gap-8 flex-wrap">
-            {gameState.options.slice(5).map((color) => (
+            {gameState.options.slice(5, 9).map((color) => (
               <ColorSwatch
                 key={color}
                 color={color}
@@ -331,8 +331,8 @@ function GameComponent() {
       )}
       
       {gameState.isPlaying && (
-        <div className="space-y-2 sm:space-y-4 mt-20 sm:mt-16">
-          <div className="h-6 sm:h-8 md:h-10 flex items-center justify-center">
+        <div className="space-y-2 sm:space-y-4 mt-12 sm:mt-8">
+          <div className="h-6 flex items-center justify-center">
             <AnimatePresence>
               {showFeedback && (
                 <motion.div

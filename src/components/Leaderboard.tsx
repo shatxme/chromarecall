@@ -82,13 +82,13 @@ export function Leaderboard({ currentUserId }: LeaderboardProps) {
 
   return (
     <>
-      <Table>
+      <Table className="w-full">
         <TableHeader>
           <TableRow>
-            <TableHead className="w-[100px]">Rank</TableHead>
+            <TableHead className="w-[60px] sm:w-[100px]">Rank</TableHead>
             <TableHead>Username</TableHead>
-            <TableHead>Score</TableHead>
-            <TableHead>Level</TableHead>
+            <TableHead className="text-right">Score</TableHead>
+            <TableHead className="text-right">Level</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -101,8 +101,8 @@ export function Leaderboard({ currentUserId }: LeaderboardProps) {
                 </div>
               </TableCell>
               <TableCell>{entry.username}</TableCell>
-              <TableCell>{entry.score}</TableCell>
-              <TableCell>{entry.level}</TableCell>
+              <TableCell className="text-right">{entry.score}</TableCell>
+              <TableCell className="text-right">{entry.level}</TableCell>
             </TableRow>
           ))}
         </TableBody>
