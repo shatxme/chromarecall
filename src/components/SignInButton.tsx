@@ -16,10 +16,10 @@ export function SignInButton() {
     return <Button disabled size="sm" className="h-8 text-xs sm:text-sm sm:h-10">Loading...</Button>
   }
 
-  if (session && session.user) {
+  if (status === 'authenticated' && session?.user) {
     return (
       <Button onClick={() => signOut({ callbackUrl: '/' })} size="sm" className="h-8 text-xs sm:text-sm sm:h-10">
-        Sign Out
+        Sign Out ({session.user.name})
       </Button>
     )
   }
