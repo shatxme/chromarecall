@@ -71,29 +71,12 @@ export function Leaderboard({ currentUserId, currentScore, showOnlyUserStats = f
     return <div>Error: {error}</div>
   }
 
-  const getRankStyle = (index: number) => {
-    switch(index) {
-      case 0: return "bg-yellow-100 text-yellow-800";
-      case 1: return "bg-gray-100 text-gray-800";
-      case 2: return "bg-orange-100 text-orange-800";
-      default: return "";
-    }
-  }
-
-  const getRankIcon = (index: number) => {
-    switch(index) {
-      case 0: return <Trophy className="w-5 h-5 text-yellow-500" />;
-      case 1: return <Trophy className="w-5 h-5 text-gray-500" />;
-      case 2: return <Trophy className="w-5 h-5 text-orange-500" />;
-      default: return null;
-    }
-  }
-
   if (showOnlyUserStats) {
     if (!currentUserId) {
       return (
         <div className="text-center">
-          <p className="font-semibold text-lg">Sign in to see your stats!</p>
+          <p className="font-semibold text-lg">Your Score: {currentScore || 0}</p>
+          <p className="mt-2">Sign in to save your score and become a color champion!</p>
         </div>
       )
     }
@@ -140,7 +123,7 @@ export function Leaderboard({ currentUserId, currentScore, showOnlyUserStats = f
           </TableBody>
         </Table>
       </div>
-      {userPlace && userHighestScore !== null && (
+      {currentUserId && userPlace && userHighestScore !== null && (
         <div className="mt-4 text-center">
           <p className="font-semibold">Your All-Time Highest Score: {userHighestScore}</p>
           <p className="font-semibold">Your Current Place: {userPlace}</p>
@@ -148,4 +131,22 @@ export function Leaderboard({ currentUserId, currentScore, showOnlyUserStats = f
       )}
     </div>
   )
+}
+
+function getRankStyle(index: number): string {
+  switch (index) {
+    case 0: return 'bg-yellow-100'
+    case 1: return 'bg-gray-100'
+    case 2: return 'bg-orange-100'
+    default: return ''
+  }
+}
+
+function getRankIcon(index: number) {
+  switch (index) {
+    case 0: return <Trophy className="h-5 w-5 text-yellow-500" />
+    case 1: return <Trophy className="h-5 w-5 text-gray-500" />
+    case 2: return <Trophy className="h-5 w-5 text-orange-500" />
+    default: return null
+  }
 }

@@ -17,6 +17,7 @@ import { PlayIcon, Crown } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import type { GameState } from "../types"
 import { calculateColorDifference } from "../lib/color-utils"
+import { signIn } from 'next-auth/react'
 
 const ColorSwatch = dynamic(() => import('./color-swatch'))
 const ScoreDisplay = dynamic(() => import('./score-display'))
@@ -62,14 +63,9 @@ function calculateDifficulty(level: number, performanceRating: number) {
 }
 
 function GameComponent() {
-  const { data: session, status, update } = useSession()
+  const { data: session, status } = useSession()
+  const memoizedToast = useCallback(toast, []);
   
-  useEffect(() => {
-    if (status === 'loading') {
-      update()
-    }
-  }, [status, update])
-
   useEffect(() => {
     console.log('Session in GameComponent:', session)
     console.log('Session status in GameComponent:', status)
@@ -144,7 +140,7 @@ function GameComponent() {
       const updatedHighScore = newHighScore ? prev.score : prev.highScore;
       
       if (newHighScore) {
-        toast({
+        memoizedToast({
           title: "New High Score!",
           description: `Congratulations! You've set a new high score of ${prev.score} points!`,
         });
@@ -189,7 +185,7 @@ function GameComponent() {
     if (lost) {
       setShowLossDialog(true);
     }
-  }, [session, gameState.score, gameState.level])
+  }, [session, gameState.score, gameState.level, memoizedToast])
 
   useEffect(() => {
     let timer: NodeJS.Timeout
@@ -302,11 +298,11 @@ function GameComponent() {
     
     setShowTarget(true);
     
-    toast({
+    memoizedToast({
       title: "Color Selected!",
       description: `You earned ${totalPoints} points! (Accuracy: ${accuracyPoints}, Speed: ${speedPoints}${newComboMultiplier > 1 ? `, Combo: ${newComboMultiplier.toFixed(1)}x` : ''})`,
     });
-  }, [gameState, performanceRating, levelStarted, closeMatches, comboMultiplier, endGame, setExactMatch, setLevelStarted, setCloseMatches, setPerformanceRating, setComboMultiplier, setFeedbackText, setShowFeedback, setGameState, setShowTarget, generateColorsWithWorker]);
+  }, [gameState, performanceRating, levelStarted, closeMatches, comboMultiplier, endGame, setExactMatch, setLevelStarted, setCloseMatches, setPerformanceRating, setComboMultiplier, setFeedbackText, setShowFeedback, setGameState, setShowTarget, generateColorsWithWorker, memoizedToast]);
 
   const renderColorSwatches = useCallback(() => {
     const totalColors = Math.min(9, gameState.options.length);
@@ -453,6 +449,11 @@ function GameComponent() {
             <Button onClick={() => setShowLeaderboard(true)} className="w-full bg-yellow-500 hover:bg-yellow-600">
               <Crown className="mr-2 h-4 w-4" /> View Champions
             </Button>
+            {!session?.user && (
+              <Button onClick={() => signIn('google')} className="w-full bg-blue-500 hover:bg-blue-600">
+                Sign In to Save Score
+              </Button>
+            )}
           </div>
         </DialogContent>
       </Dialog>
