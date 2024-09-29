@@ -323,12 +323,12 @@ function GameComponent() {
           </h2>
           <div className="bg-white bg-opacity-80 p-4 sm:p-6 rounded-lg shadow-md mb-6">
             <p className="text-sm sm:text-base md:text-lg text-gray-700 leading-relaxed text-center mb-2">
-              Here's how to play:
+              Here&apos;s how to play:
             </p>
             <ul className="text-sm sm:text-base md:text-lg text-gray-700 list-disc list-inside mt-2 space-y-2 text-left">
               <li>A color will appear briefly</li>
               <li>Memorize it, then choose the matching color from the options</li>
-              <li>You can pick close matches, but you're limited to 3 in early levels</li>
+              <li>You can pick close matches, but you&apos;re limited to 3 in early levels</li>
               <li>Be quick and accurate to score high!</li>
             </ul>
           </div>
