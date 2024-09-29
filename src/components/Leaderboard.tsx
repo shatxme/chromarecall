@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table"
 import { Trophy } from 'lucide-react'
 
@@ -23,45 +23,45 @@ export function Leaderboard({ currentUserId, currentScore, showOnlyUserStats = f
   const [userPlace, setUserPlace] = useState<number | null>(null)
   const [userHighestScore, setUserHighestScore] = useState<number | null>(null)
 
-  useEffect(() => {
-    const fetchLeaderboard = async () => {
-      try {
-        const response = await fetch('/api/leaderboard')
-        if (!response.ok) {
-          throw new Error(`Failed to fetch leaderboard: ${response.status} ${response.statusText}`)
-        }
-        const data = await response.json()
-        setLeaderboard(data)
-        console.log('Fetched leaderboard data:', data)
-
-        if (currentUserId) {
-          try {
-            // Fetch the user's highest score and rank
-            const userScoreResponse = await fetch(`/api/user-score?userId=${currentUserId}`)
-            if (userScoreResponse.ok) {
-              const { highestScore } = await userScoreResponse.json()
-              setUserHighestScore(highestScore)
-              
-              // Calculate rank based on the fetched leaderboard
-              const rank = leaderboard.findIndex(entry => entry.score <= highestScore) + 1
-              setUserPlace(rank)
-            } else {
-              console.error('Failed to fetch user score:', await userScoreResponse.text())
-            }
-          } catch (error) {
-            console.error('Error fetching user score:', error)
-          }
-        }
-      } catch (error) {
-        console.error('Error fetching leaderboard:', error)
-        setError(error instanceof Error ? error.message : 'An unknown error occurred')
-      } finally {
-        setIsLoading(false)
+  const fetchLeaderboard = useCallback(async () => {
+    try {
+      const response = await fetch('/api/leaderboard')
+      if (!response.ok) {
+        throw new Error(`Failed to fetch leaderboard: ${response.status} ${response.statusText}`)
       }
-    }
+      const data = await response.json()
+      setLeaderboard(data)
+      console.log('Fetched leaderboard data:', data)
 
+      if (currentUserId) {
+        try {
+          // Fetch the user's highest score and rank
+          const userScoreResponse = await fetch(`/api/user-score?userId=${currentUserId}`)
+          if (userScoreResponse.ok) {
+            const { highestScore } = await userScoreResponse.json()
+            setUserHighestScore(highestScore)
+            
+            // Calculate rank based on the fetched leaderboard
+            const rank = data.findIndex((entry: LeaderboardEntry) => entry.score <= highestScore) + 1
+            setUserPlace(rank)
+          } else {
+            console.error('Failed to fetch user score:', await userScoreResponse.text())
+          }
+        } catch (error) {
+          console.error('Error fetching user score:', error)
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching leaderboard:', error)
+      setError(error instanceof Error ? error.message : 'An unknown error occurred')
+    } finally {
+      setIsLoading(false)
+    }
+  }, [currentUserId])
+
+  useEffect(() => {
     fetchLeaderboard()
-  }, [currentUserId, currentScore])
+  }, [fetchLeaderboard, currentScore])
 
   if (isLoading) {
     return <div>Loading leaderboard...</div>

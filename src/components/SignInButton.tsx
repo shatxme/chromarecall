@@ -5,15 +5,12 @@ import { Button } from "@/components/ui/button"
 import { useEffect } from 'react'
 
 export function SignInButton() {
-  const { data: session, status, update } = useSession()
+  const { data: session, status } = useSession()
 
   useEffect(() => {
-    if (status === 'loading') {
-      update()
-    }
-    console.log('SignInButton: Session status:', status)
+    console.log('SignInButton: Session status:', status, new Date().toISOString())
     console.log('SignInButton: Session data:', session)
-  }, [status, update, session])
+  }, [status, session])
 
   if (status === 'loading') {
     return <Button disabled size="sm" className="h-8 text-xs sm:text-sm sm:h-10">Loading...</Button>
@@ -30,7 +27,7 @@ export function SignInButton() {
   return (
     <Button 
       onClick={() => {
-        console.log('Initiating sign in...')
+        console.log('Initiating sign in...', new Date().toISOString())
         signIn('google', { callbackUrl: window.location.origin })
       }}
       size="sm" 
