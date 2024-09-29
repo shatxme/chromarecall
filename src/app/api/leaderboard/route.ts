@@ -64,16 +64,28 @@ export async function POST(request: NextRequest) {
     const db = client.db("colormemorygame");
     const collection = db.collection("scores");
 
-    const { userId, username, score, level } = await request.json();
+    const { username, score, level } = await request.json();
 
-    // Insert the new score
-    await collection.insertOne({
-      userId,
-      username,
-      score,
-      level,
-      createdAt: new Date()
-    });
+    // Check if the user already exists
+    const existingUser = await collection.findOne({ username });
+
+    if (existingUser) {
+      // Update the score if it's higher than the existing one
+      if (score > existingUser.score) {
+        await collection.updateOne(
+          { username },
+          { $set: { score, level, updatedAt: new Date() } }
+        );
+      }
+    } else {
+      // Insert new user
+      await collection.insertOne({
+        username,
+        score,
+        level,
+        createdAt: new Date()
+      });
+    }
 
     // Invalidate cache on new score
     leaderboardCache = null;
@@ -82,18 +94,9 @@ export async function POST(request: NextRequest) {
     const rank = await collection.countDocuments({ score: { $gt: score } }) + 1;
     const isTopTen = rank <= 10;
 
-    // Get the user's highest score
-    const userHighestScore = await collection
-      .find({ userId: userId })
-      .sort({ score: -1 })
-      .limit(1)
-      .toArray();
-
-    const highestScore = userHighestScore.length > 0 ? userHighestScore[0].score : score;
-
     return NextResponse.json({ 
       message: "Score saved successfully", 
-      highestScore: highestScore,
+      highestScore: score,
       isTopTen,
       rank: rank
     }, { status: 201 });

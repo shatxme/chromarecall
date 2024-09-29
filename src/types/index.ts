@@ -9,3 +9,8 @@ export interface GameState {
 }
 
 // Add any other types you might need for the game
+
+export interface LocalUserData {
+  username: string;
+  highestScore: number;
+}

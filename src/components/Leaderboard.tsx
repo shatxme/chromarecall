@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table"
 import { Trophy } from 'lucide-react'
+import type { LocalUserData } from "../types"
 
 type LeaderboardEntry = {
   username: string
@@ -11,17 +12,16 @@ type LeaderboardEntry = {
 }
 
 interface LeaderboardProps {
-  currentUserId?: string
-  currentScore?: number
-  showOnlyUserStats?: boolean
+  localUserData: LocalUserData | null;
+  currentScore?: number;
+  showOnlyUserStats?: boolean;
 }
 
-export function Leaderboard({ currentUserId, currentScore, showOnlyUserStats = false }: LeaderboardProps) {
+export function Leaderboard({ localUserData, currentScore, showOnlyUserStats = false }: LeaderboardProps) {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [userPlace, setUserPlace] = useState<number | null>(null)
-  const [userHighestScore, setUserHighestScore] = useState<number | null>(null)
 
   const fetchLeaderboard = useCallback(async () => {
     try {
@@ -33,23 +33,10 @@ export function Leaderboard({ currentUserId, currentScore, showOnlyUserStats = f
       setLeaderboard(data)
       console.log('Fetched leaderboard data:', data)
 
-      if (currentUserId) {
-        try {
-          // Fetch the user's highest score and rank
-          const userScoreResponse = await fetch(`/api/user-score?userId=${currentUserId}`)
-          if (userScoreResponse.ok) {
-            const { highestScore } = await userScoreResponse.json()
-            setUserHighestScore(highestScore)
-            
-            // Calculate rank based on the fetched leaderboard
-            const rank = data.findIndex((entry: LeaderboardEntry) => entry.score <= highestScore) + 1
-            setUserPlace(rank)
-          } else {
-            console.error('Failed to fetch user score:', await userScoreResponse.text())
-          }
-        } catch (error) {
-          console.error('Error fetching user score:', error)
-        }
+      if (localUserData) {
+        // Calculate rank based on the fetched leaderboard
+        const rank = data.findIndex((entry: LeaderboardEntry) => entry.score <= localUserData.highestScore) + 1
+        setUserPlace(rank)
       }
     } catch (error) {
       console.error('Error fetching leaderboard:', error)
@@ -57,7 +44,7 @@ export function Leaderboard({ currentUserId, currentScore, showOnlyUserStats = f
     } finally {
       setIsLoading(false)
     }
-  }, [currentUserId])
+  }, [localUserData])
 
   useEffect(() => {
     fetchLeaderboard()
@@ -72,23 +59,17 @@ export function Leaderboard({ currentUserId, currentScore, showOnlyUserStats = f
   }
 
   if (showOnlyUserStats) {
-    if (!currentUserId) {
-      return (
-        <div className="text-center">
-          <p className="font-semibold text-lg">Your Score: {currentScore || 0}</p>
-          <p className="mt-2">Sign in to save your score and become a color champion!</p>
-        </div>
-      )
-    }
     return (
       <div className="text-center">
-        <p className="font-semibold text-lg">Your All-Time Highest Score: {userHighestScore || 'N/A'}</p>
-        <p className="font-semibold text-lg">Your Current Place: {userPlace || 'N/A'}</p>
-        {currentScore !== undefined && (
-          <p className="font-semibold text-lg">Your Current Score: {currentScore}</p>
-        )}
-        {currentScore !== undefined && userHighestScore !== null && currentScore > userHighestScore && (
-          <p className="font-semibold text-lg text-green-600">New Personal Best!</p>
+        <p className="font-semibold text-lg">Your Score: {currentScore || 0}</p>
+        {localUserData && (
+          <>
+            <p className="font-semibold text-lg">Your All-Time Highest Score: {localUserData.highestScore}</p>
+            <p className="font-semibold text-lg">Your Current Place: {userPlace || 'N/A'}</p>
+            {currentScore !== undefined && currentScore > localUserData.highestScore && (
+              <p className="font-semibold text-lg text-green-600">New Personal Best!</p>
+            )}
+          </>
         )}
       </div>
     )
@@ -123,9 +104,9 @@ export function Leaderboard({ currentUserId, currentScore, showOnlyUserStats = f
           </TableBody>
         </Table>
       </div>
-      {currentUserId && userPlace && userHighestScore !== null && (
+      {localUserData && userPlace && (
         <div className="mt-4 text-center">
-          <p className="font-semibold">Your All-Time Highest Score: {userHighestScore}</p>
+          <p className="font-semibold">Your All-Time Highest Score: {localUserData.highestScore}</p>
           <p className="font-semibold">Your Current Place: {userPlace}</p>
         </div>
       )}

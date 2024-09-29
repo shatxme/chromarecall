@@ -1,8 +1,8 @@
 "use client"
 
 import React, { useState, useEffect, useCallback, useRef } from "react"
-import { SessionProvider, useSession } from 'next-auth/react'
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { Progress } from "@/components/ui/progress"
 import { toast } from "@/components/ui/use-toast"
 import {
@@ -15,17 +15,12 @@ import {
 import dynamic from 'next/dynamic'
 import { PlayIcon, Crown } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
-import type { GameState } from "../types"
+import type { GameState, LocalUserData } from "../types"
 import { calculateColorDifference } from "../lib/color-utils"
-import { signIn } from 'next-auth/react'
 
 const ColorSwatch = dynamic(() => import('./color-swatch'))
 const ScoreDisplay = dynamic(() => import('./score-display'))
 const Leaderboard = dynamic(() => import('./Leaderboard').then(mod => mod.Leaderboard))
-const SignInButton = dynamic(() => import('./SignInButton').then(mod => mod.SignInButton), {
-  loading: () => <Button disabled>Loading...</Button>,
-  ssr: false
-})
 
 function calculateDifficulty(level: number, performanceRating: number) {
   // Color count calculation
@@ -63,17 +58,17 @@ function calculateDifficulty(level: number, performanceRating: number) {
 }
 
 function GameComponent() {
-  const { data: session, status } = useSession()
+  const [localUserData, setLocalUserData] = useState<LocalUserData | null>(null)
+  const [showUsernameInput, setShowUsernameInput] = useState(false)
+  const [tempUsername, setTempUsername] = useState('')
   const memoizedToast = useCallback(toast, []);
   
   useEffect(() => {
-    console.log('Session in GameComponent:', session)
-    console.log('Session status in GameComponent:', status)
-
-    if (status === 'authenticated' && session?.user?.id) {
-      fetchUserHighScore(session.user.id)
+    const storedData = localStorage.getItem('userData')
+    if (storedData) {
+      setLocalUserData(JSON.parse(storedData))
     }
-  }, [session, status])
+  }, [])
 
   const [gameState, setGameState] = useState<GameState>({
     targetColor: '',
@@ -99,24 +94,6 @@ function GameComponent() {
 
   const workerRef = useRef<Worker | null>(null);
 
-  const fetchUserHighScore = async (userId: string) => {
-    if (!userId) {
-      console.log('No user ID available, skipping high score fetch')
-      return
-    }
-    try {
-      const response = await fetch(`/api/user-score?userId=${userId}`)
-      if (response.ok) {
-        const data = await response.json()
-        setGameState(prev => ({ ...prev, highScore: data.highestScore }))
-      } else {
-        console.error('Failed to fetch user high score:', await response.text())
-      }
-    } catch (error) {
-      console.error('Error fetching user high score:', error)
-    }
-  }
-
   useEffect(() => {
     workerRef.current = new Worker(new URL('../workers/colorWorker.ts', import.meta.url));
     return () => workerRef.current?.terminate();
@@ -133,11 +110,33 @@ function GameComponent() {
     });
   }, []);
 
+  const saveUserData = useCallback((username: string, score: number) => {
+    const userData: LocalUserData = { username, highestScore: score }
+    localStorage.setItem('userData', JSON.stringify(userData))
+    setLocalUserData(userData)
+  }, [])
+
+  const handleUsernameSubmit = useCallback(async () => {
+    if (tempUsername.trim()) {
+      // Check if username exists in the leaderboard
+      const response = await fetch(`/api/check-username?username=${encodeURIComponent(tempUsername)}`)
+      const { exists, highestScore } = await response.json()
+
+      if (exists) {
+        saveUserData(tempUsername, Math.max(highestScore, gameState.score))
+      } else {
+        saveUserData(tempUsername, gameState.score)
+      }
+
+      setShowUsernameInput(false)
+      setTempUsername('')
+    }
+  }, [tempUsername, gameState.score, saveUserData])
+
   const endGame = useCallback(async (lost = false) => {
     setGameState(prev => {
-      const newHighScore = prev.score > prev.highScore;
+      const newHighScore = prev.score > (localUserData?.highestScore || 0);
       setIsNewHighScore(newHighScore);
-      const updatedHighScore = newHighScore ? prev.score : prev.highScore;
       
       if (newHighScore) {
         memoizedToast({
@@ -146,46 +145,49 @@ function GameComponent() {
         });
       }
       
-      return { ...prev, isPlaying: false, highScore: updatedHighScore };
+      return { ...prev, isPlaying: false };
     });
 
-    if (session?.user?.id) {
-      try {
-        const response = await fetch('/api/leaderboard', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            userId: session.user.id,
-            username: session.user.name || 'Anonymous',
-            score: gameState.score,
-            level: gameState.level,
-          }),
-        });
+    if (!localUserData) {
+      setShowUsernameInput(true)
+    } else if (gameState.score > localUserData.highestScore) {
+      saveUserData(localUserData.username, gameState.score)
+    }
 
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.message || 'Failed to save score');
-        }
+    try {
+      const response = await fetch('/api/leaderboard', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: localUserData?.username || 'Anonymous',
+          score: gameState.score,
+          level: gameState.level,
+        }),
+      });
 
-        const result = await response.json();
-        // Update the game state with the new highest score and rank
-        setGameState(prev => ({
-          ...prev,
-          highScore: result.highestScore,
-          rank: result.rank
-        }));
-      } catch (error) {
-        toast({
-          title: "Error",
-          description: "Failed to save your score. Please try again.",
-        });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to save score');
       }
+
+      const result = await response.json();
+      // Update the game state with the new highest score and rank
+      setGameState(prev => ({
+        ...prev,
+        highScore: result.highestScore,
+        rank: result.rank
+      }));
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to save your score. Please try again.",
+      });
     }
 
     if (lost) {
       setShowLossDialog(true);
     }
-  }, [session, gameState.score, gameState.level, memoizedToast])
+  }, [gameState.score, gameState.level, localUserData, memoizedToast, saveUserData])
 
   useEffect(() => {
     let timer: NodeJS.Timeout
@@ -351,7 +353,6 @@ function GameComponent() {
         >
           <Crown className="mr-1 h-4 w-4" /> Champions
         </Button>
-        <SignInButton />
       </div>
       
       {!gameState.isPlaying && (
@@ -437,23 +438,35 @@ function GameComponent() {
             </p>
             <p className="text-xl text-center">Level Reached: {gameState.level}</p>
             <Leaderboard 
-              currentUserId={session?.user?.id} 
+              localUserData={localUserData} 
               currentScore={gameState.score} 
               showOnlyUserStats={true} 
             />
+            {!localUserData && (
+              <div>
+                <p className="text-sm text-gray-600 mb-2">Enter a username to save your score:</p>
+                <Input
+                  value={tempUsername}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTempUsername(e.target.value)}
+                  placeholder="Username"
+                  required
+                />
+              </div>
+            )}
           </div>
           <div className="flex flex-col gap-4">
-            <Button onClick={startGame} className="w-full bg-green-500 hover:bg-green-600">
-              <PlayIcon className="mr-2 h-4 w-4" /> Play Again
-            </Button>
-            <Button onClick={() => setShowLeaderboard(true)} className="w-full bg-yellow-500 hover:bg-yellow-600">
-              <Crown className="mr-2 h-4 w-4" /> View Champions
-            </Button>
-            {!session?.user && (
-              <Button onClick={() => signIn('google')} className="w-full bg-blue-500 hover:bg-blue-600">
-                Sign In to Save Score
+            {!localUserData ? (
+              <Button onClick={handleUsernameSubmit} disabled={!tempUsername.trim()}>
+                Save Score and Play Again
+              </Button>
+            ) : (
+              <Button onClick={startGame}>
+                Play Again
               </Button>
             )}
+            <Button onClick={() => setShowLeaderboard(true)} className="bg-yellow-500 hover:bg-yellow-600">
+              <Crown className="mr-2 h-4 w-4" /> View Champions
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
@@ -467,24 +480,16 @@ function GameComponent() {
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
-            <Leaderboard currentUserId={session?.user?.id} />
+            <Leaderboard localUserData={localUserData} />
           </div>
         </DialogContent>
       </Dialog>
-
-      {status === 'authenticated' && session?.user?.name ? (
-        <p>Welcome, {session.user.name}!</p>
-      ) : status === 'loading' ? (
-        <p>Loading session...</p>
-      ) : null}
     </div>
   )
 }
 
 export function ColorMemoryGame() {
   return (
-    <SessionProvider>
-      <GameComponent />
-    </SessionProvider>
+    <GameComponent />
   )
 }
