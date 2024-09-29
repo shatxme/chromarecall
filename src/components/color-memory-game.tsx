@@ -126,7 +126,7 @@ function GameComponent() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             userId: session.user.id,
-            username: session.user.name || 'Anonymous',
+            username: session.user.name || 'Anonymous', // Use name instead of username
             score: gameState.score,
             level: gameState.level,
           }),

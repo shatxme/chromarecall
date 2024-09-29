@@ -11,6 +11,16 @@ const handler = NextAuth({
       clientSecret: process.env.GOOGLE_SECRET || '',
     }),
   ],
+  callbacks: {
+    async session({ session, token }) {
+      if (session.user) {
+        session.user.id = token.sub;
+        // Create a username from the email
+        session.user.name = session.user.email ? session.user.email.split('@')[0] : 'Anonymous';
+      }
+      return session;
+    },
+  },
   secret: process.env.NEXTAUTH_SECRET,
   debug: true, // Enable debug logs
 });
