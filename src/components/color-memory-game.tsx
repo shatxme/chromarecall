@@ -92,7 +92,6 @@ function GameComponent() {
     console.log('Session status in GameComponent:', status)
 
     if (status === 'authenticated' && session?.user?.id) {
-      // Fetch user's high score or perform any other authenticated actions
       fetchUserHighScore(session.user.id)
     }
   }, [session, status])

@@ -24,7 +24,7 @@ export function SignInButton() {
 
   if (session && session.user) {
     return (
-      <Button onClick={() => signOut()} size="sm" className="h-8 text-xs sm:text-sm sm:h-10">
+      <Button onClick={() => signOut({ callbackUrl: '/' })} size="sm" className="h-8 text-xs sm:text-sm sm:h-10">
         Sign Out
       </Button>
     )
