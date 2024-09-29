@@ -114,7 +114,7 @@ function GameComponent() {
         const data = await response.json()
         setGameState(prev => ({ ...prev, highScore: data.highestScore }))
       } else {
-        console.error('Failed to fetch user high score:', response.statusText)
+        console.error('Failed to fetch user high score:', await response.text())
       }
     } catch (error) {
       console.error('Error fetching user high score:', error)

@@ -35,16 +35,21 @@ export function Leaderboard({ currentUserId, currentScore, showOnlyUserStats = f
         console.log('Fetched leaderboard data:', data)
 
         if (currentUserId) {
-          // Fetch the user's highest score and rank
-          const userScoreResponse = await fetch(`/api/leaderboard`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId: currentUserId, score: currentScore || 0 })
-          })
-          if (userScoreResponse.ok) {
-            const { highestScore, rank } = await userScoreResponse.json()
-            setUserHighestScore(highestScore)
-            setUserPlace(rank)
+          try {
+            // Fetch the user's highest score and rank
+            const userScoreResponse = await fetch(`/api/user-score?userId=${currentUserId}`)
+            if (userScoreResponse.ok) {
+              const { highestScore } = await userScoreResponse.json()
+              setUserHighestScore(highestScore)
+              
+              // Calculate rank based on the fetched leaderboard
+              const rank = leaderboard.findIndex(entry => entry.score <= highestScore) + 1
+              setUserPlace(rank)
+            } else {
+              console.error('Failed to fetch user score:', await userScoreResponse.text())
+            }
+          } catch (error) {
+            console.error('Error fetching user score:', error)
           }
         }
       } catch (error) {
