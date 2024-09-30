@@ -22,6 +22,14 @@ const ColorSwatch = dynamic(() => import('./color-swatch'))
 const ScoreDisplay = dynamic(() => import('./score-display'))
 const Leaderboard = dynamic(() => import('./Leaderboard').then(mod => mod.Leaderboard))
 
+// Add this near the top of your file
+const AttractiveButton: React.FC<React.ButtonHTMLAttributes<HTMLButtonElement>> = ({ className, ...props }) => (
+  <Button
+    className={`bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-bold py-3 px-6 rounded-lg shadow-lg transition duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-opacity-50 ${className}`}
+    {...props}
+  />
+);
+
 function calculateDifficulty(level: number, performanceRating: number) {
   // Color count calculation
   const baseColorCount = 3;
@@ -453,17 +461,14 @@ export function ColorMemoryGame() {
           </div>
           <div className="flex flex-col gap-4">
             {showUsernameInput ? (
-              <Button onClick={handleUsernameSubmit} disabled={!tempUsername.trim()}>
+              <AttractiveButton onClick={handleUsernameSubmit} disabled={!tempUsername.trim()}>
                 Save Score and Play Again
-              </Button>
+              </AttractiveButton>
             ) : (
-              <Button onClick={startGame}>
+              <AttractiveButton onClick={startGame}>
                 Play Again
-              </Button>
+              </AttractiveButton>
             )}
-            <Button onClick={() => setShowLeaderboard(true)} className="bg-yellow-500 hover:bg-yellow-600">
-              <Crown className="mr-2 h-4 w-4" /> View Champions
-            </Button>
           </div>
         </DialogContent>
       </Dialog>
