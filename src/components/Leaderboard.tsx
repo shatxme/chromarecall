@@ -13,17 +13,16 @@ type LeaderboardEntry = {
 
 interface LeaderboardProps {
   localUserData: LocalUserData | null;
-  currentScore?: number;
+  isLoading: boolean;
+  setIsLoading: (isLoading: boolean) => void;
 }
 
-export function Leaderboard({ localUserData, currentScore }: LeaderboardProps) {
+export function Leaderboard({ localUserData, isLoading, setIsLoading }: LeaderboardProps) {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([])
-  const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   const fetchLeaderboard = useCallback(async () => {
     try {
-      setIsLoading(true);
       const response = await fetch('/api/leaderboard')
       if (!response.ok) {
         throw new Error(`Failed to fetch leaderboard: ${response.status} ${response.statusText}`)
@@ -44,11 +43,13 @@ export function Leaderboard({ localUserData, currentScore }: LeaderboardProps) {
     } finally {
       setIsLoading(false)
     }
-  }, [localUserData])
+  }, [localUserData, setIsLoading])
 
   useEffect(() => {
-    fetchLeaderboard()
-  }, [fetchLeaderboard, currentScore])
+    if (isLoading) {
+      fetchLeaderboard()
+    }
+  }, [fetchLeaderboard, isLoading])
 
   if (isLoading) {
     return <div>Loading leaderboard...</div>

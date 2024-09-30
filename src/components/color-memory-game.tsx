@@ -69,9 +69,10 @@ function calculateDifficulty(level: number, performanceRating: number) {
 const scoreSavingWorker = new Worker(new URL('../workers/scoreSavingWorker.ts', import.meta.url));
 
 export function ColorMemoryGame() {
-  const [localUserData, setLocalUserData] = useState<LocalUserData | null>(null)
-  const [showUsernameInput, setShowUsernameInput] = useState(false)
-  const [tempUsername, setTempUsername] = useState('')
+  const [localUserData, setLocalUserData] = useState<LocalUserData | null>(null);
+  const [showUsernameInput, setShowUsernameInput] = useState(false);
+  const [tempUsername, setTempUsername] = useState('');
+  const [isLeaderboardLoading, setIsLeaderboardLoading] = useState(false);
   const memoizedToast = useCallback(toast, []);
   
   useEffect(() => {
@@ -236,8 +237,8 @@ export function ColorMemoryGame() {
   // Update the openLeaderboard function
   const openLeaderboard = useCallback(() => {
     if (!showLeaderboard) {
+      setIsLeaderboardLoading(true);
       setShowLeaderboard(true);
-      // Force a refresh of the leaderboard
       if (localUserData) {
         saveScoreInBackground(localUserData.username, gameState.score, gameState.level);
       }
@@ -514,7 +515,11 @@ export function ColorMemoryGame() {
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
-            <Leaderboard localUserData={localUserData} currentScore={gameState.score} />
+            <Leaderboard 
+              localUserData={localUserData} 
+              isLoading={isLeaderboardLoading}
+              setIsLoading={setIsLeaderboardLoading}
+            />
           </div>
         </DialogContent>
       </Dialog>
