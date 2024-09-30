@@ -23,6 +23,7 @@ export function Leaderboard({ localUserData, currentScore }: LeaderboardProps) {
 
   const fetchLeaderboard = useCallback(async () => {
     try {
+      setIsLoading(true);
       const response = await fetch('/api/leaderboard')
       if (!response.ok) {
         throw new Error(`Failed to fetch leaderboard: ${response.status} ${response.statusText}`)

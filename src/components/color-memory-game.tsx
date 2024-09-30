@@ -139,6 +139,29 @@ export function ColorMemoryGame() {
     }
   }, [localUserData])
 
+  // Move the saveScoreInBackground function declaration before handleUsernameSubmit
+  const saveScoreInBackground = useCallback((username: string, score: number, level: number) => {
+    scoreSavingWorker.postMessage({ username, score, level });
+    scoreSavingWorker.onmessage = (event) => {
+      if (event.data.error) {
+        console.error('Failed to save score:', event.data.error);
+        memoizedToast({
+          title: "Error",
+          description: "Failed to save your score. Please try again.",
+        });
+      } else {
+        setGameState(prev => ({
+          ...prev,
+          highScore: event.data.highestScore,
+        }));
+        updateUserData(event.data.highestScore);
+        // Force a refresh of the leaderboard
+        setShowLeaderboard(false);
+        setTimeout(() => setShowLeaderboard(true), 100);
+      }
+    };
+  }, [memoizedToast, updateUserData]);
+
   const handleUsernameSubmit = useCallback(async () => {
     if (tempUsername.trim()) {
       // Check if username exists in the leaderboard
@@ -153,28 +176,11 @@ export function ColorMemoryGame() {
 
       setShowUsernameInput(false)
       setTempUsername('')
+      
+      // Save score immediately after setting username
+      saveScoreInBackground(tempUsername, gameState.score, gameState.level);
     }
-  }, [tempUsername, gameState.score, saveUserData])
-
-  const saveScoreInBackground = useCallback((username: string, score: number, level: number) => {
-    scoreSavingWorker.postMessage({ username, score, level });
-    scoreSavingWorker.onmessage = (event) => {
-      if (event.data.error) {
-        console.error('Failed to save score:', event.data.error);
-        memoizedToast({
-          title: "Error",
-          description: "Failed to save your score. Please try again.",
-        });
-      } else {
-        setGameState(prev => ({
-          ...prev,
-          highScore: event.data.highestScore,
-          rank: event.data.rank
-        }));
-        updateUserData(event.data.highestScore);
-      }
-    };
-  }, [memoizedToast, updateUserData]);
+  }, [tempUsername, gameState.score, gameState.level, saveUserData, saveScoreInBackground]);
 
   const endGame = useCallback((lost = false) => {
     setGameState(prev => {
@@ -202,6 +208,9 @@ export function ColorMemoryGame() {
     if (lost) {
       setShowLossDialog(true);
     }
+
+    // Show leaderboard after saving score
+    setTimeout(() => setShowLeaderboard(true), 500);
   }, [gameState.score, gameState.level, localUserData, memoizedToast, saveScoreInBackground]);
 
   useEffect(() => {
@@ -246,6 +255,7 @@ export function ColorMemoryGame() {
     setCloseMatches(0);
     setLevelStarted(0);
     setPerformanceRating(1);
+    setOptimisticHighScore(null); // Reset optimistic high score
   }, [generateColorsWithWorker]);
 
   const handleColorSelect = useCallback(async (selectedColor: string) => {
