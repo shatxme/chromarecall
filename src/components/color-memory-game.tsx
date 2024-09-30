@@ -322,19 +322,14 @@ export function ColorMemoryGame() {
   }, [gameState, performanceRating, levelStarted, closeMatches, comboMultiplier, endGame, setExactMatch, setLevelStarted, setCloseMatches, setPerformanceRating, setComboMultiplier, setFeedbackText, setShowFeedback, setGameState, setShowTarget, generateColorsWithWorker, memoizedToast]);
 
   const renderColorSwatches = useCallback(() => {
+    const totalColors = Math.min(6, gameState.options.length);
     return (
-      <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap sm:justify-center sm:gap-4">
-        {gameState.options.map((color, index) => (
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 sm:gap-6">
+        {gameState.options.slice(0, totalColors).map((color) => (
           <ColorSwatch
             key={color}
             color={color}
             onClick={() => handleColorSelect(color)}
-            className={`
-              ${index === 3 ? 'col-start-1 row-start-2' : ''}
-              ${index === 6 ? 'col-start-1 row-start-3' : ''}
-              ${index >= 3 && index < 6 ? 'col-start-auto row-start-2' : ''}
-              ${index >= 6 ? 'col-start-auto row-start-3' : ''}
-            `}
           />
         ))}
       </div>
@@ -355,72 +350,73 @@ export function ColorMemoryGame() {
         >
           <Crown className="mr-1 h-4 w-4" /> Champions
         </Button>
+        <AnimatePresence>
+          {showFeedback && (
+            <motion.div
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 20 }}
+              className={`text-lg sm:text-xl md:text-2xl font-bold text-right ${exactMatch ? 'text-green-500' : 'text-yellow-500'}`}
+            >
+              {feedbackText}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
       
-      {!gameState.isPlaying && (
-        <div className="text-center mt-16 sm:mt-20 max-w-2xl mx-auto">
-          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4 text-gray-800">
-            Ready to test your color perception skills?
-          </h2>
-          <div className="bg-white bg-opacity-80 p-4 sm:p-6 rounded-lg shadow-md mb-6">
-            <p className="text-sm sm:text-base md:text-lg text-gray-700 leading-relaxed text-center mb-2">
-              Here&apos;s how to play:
-            </p>
-            <ul className="text-sm sm:text-base md:text-lg text-gray-700 list-disc list-inside mt-2 space-y-2 text-left">
-              <li>A color will appear briefly</li>
-              <li>Memorize it, then choose the matching color from the options</li>
-              <li>You can pick close matches, but you&apos;re limited to 3 in early levels</li>
-              <li>Be quick and accurate to score high!</li>
-            </ul>
+      {/* Add margin-top to this div */}
+      <div className="mt-16 sm:mt-20">
+        {!gameState.isPlaying && (
+          <div className="text-center mt-16 sm:mt-20 max-w-2xl mx-auto">
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4 text-gray-800">
+              Ready to test your color perception skills?
+            </h2>
+            <div className="bg-white bg-opacity-80 p-4 sm:p-6 rounded-lg shadow-md mb-6">
+              <p className="text-sm sm:text-base md:text-lg text-gray-700 leading-relaxed text-center mb-2">
+                Here&apos;s how to play:
+              </p>
+              <ul className="text-sm sm:text-base md:text-lg text-gray-700 list-disc list-inside mt-2 space-y-2 text-left">
+                <li>A color will appear briefly</li>
+                <li>Memorize it, then choose the matching color from the options</li>
+                <li>You can pick close matches, but you&apos;re limited to 3 in early levels</li>
+                <li>Be quick and accurate to score high!</li>
+              </ul>
+            </div>
+            <div className="space-y-2">
+              <Button 
+                onClick={startGame} 
+                size="lg" 
+                className="text-base sm:text-lg px-6 py-3 sm:px-8 sm:py-4 md:text-xl md:px-12 md:py-6 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700"
+              >
+                Start Game
+              </Button>
+            </div>
           </div>
-          <div className="space-y-2">
-            <Button 
-              onClick={startGame} 
-              size="lg" 
-              className="text-base sm:text-lg px-6 py-3 sm:px-8 sm:py-4 md:text-xl md:px-12 md:py-6 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700"
-            >
-              Start Game
-            </Button>
-          </div>
-        </div>
-      )}
-      
-      {gameState.isPlaying && (
-        <div className="space-y-2 sm:space-y-4 mt-12 sm:mt-8">
-          <div className="h-6 flex items-center justify-center">
-            <AnimatePresence>
-              {showFeedback && (
-                <motion.div
-                  initial={{ opacity: 0, y: -20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 20 }}
-                  className={`text-lg sm:text-xl md:text-2xl font-bold text-center absolute ${exactMatch ? 'text-green-500' : 'text-yellow-500'}`}
-                >
-                  {feedbackText}
-                </motion.div>
+        )}
+        
+        {gameState.isPlaying && (
+          <div className="space-y-2 sm:space-y-4">
+            <ScoreDisplay gameState={gameState} comboMultiplier={comboMultiplier} closeMatches={closeMatches} closeMatchLimit={gameState.level <= 50 ? 3 : 1} />
+            <div className="flex justify-center my-8 sm:my-0">
+              {showTarget ? (
+                <ColorSwatch 
+                  key={`target-${gameState.targetColor}`}
+                  color={gameState.targetColor} 
+                  size="large" 
+                  className="w-64 h-64 sm:w-80 sm:h-80" 
+                />
+              ) : (
+                renderColorSwatches()
               )}
-            </AnimatePresence>
+            </div>
+            <Progress 
+              value={(gameState.timeLeft / calculateDifficulty(gameState.level, performanceRating)[showTarget ? 'viewTime' : 'selectionTime']) * 100} 
+              className="h-2 sm:h-3 md:h-4 w-full"
+            />
           </div>
-          <ScoreDisplay gameState={gameState} comboMultiplier={comboMultiplier} closeMatches={closeMatches} closeMatchLimit={gameState.level <= 50 ? 3 : 1} />
-          <div className="flex justify-center my-8 sm:my-0">
-            {showTarget ? (
-              <ColorSwatch 
-                key={`target-${gameState.targetColor}`}
-                color={gameState.targetColor} 
-                size="large" 
-                className="w-64 h-64 sm:w-80 sm:h-80" 
-              />
-            ) : (
-              renderColorSwatches()
-            )}
-          </div>
-          <Progress 
-            value={(gameState.timeLeft / calculateDifficulty(gameState.level, performanceRating)[showTarget ? 'viewTime' : 'selectionTime']) * 100} 
-            className="h-2 sm:h-3 md:h-4 w-full"
-          />
-        </div>
-      )}
-      
+        )}
+      </div>
+
       <Dialog open={showLossDialog} onOpenChange={setShowLossDialog}>
         <DialogContent className="sm:max-w-[425px] z-50">
           <DialogHeader>
