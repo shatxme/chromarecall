@@ -104,6 +104,7 @@ export function ColorMemoryGame() {
   const [closeMatches, setCloseMatches] = useState(0);
   const [levelStarted, setLevelStarted] = useState(0);
   const [comboMultiplier, setComboMultiplier] = useState(1);
+  const [isProcessingSelection, setIsProcessingSelection] = useState(false);
 
   const workerRef = useRef<Worker | null>(null);
 
@@ -279,82 +280,80 @@ export function ColorMemoryGame() {
   }, [gameState.isPlaying, gameState.timeLeft, showTarget, gameState.level, endGame, performanceRating]);
 
   const handleColorSelect = useCallback(async (selectedColor: string) => {
-    console.log('Color selected:', selectedColor);
-    // Prevent multiple clicks
-    if (!gameState.isPlaying) return;
-
-    const difference = calculateColorDifference(gameState.targetColor, selectedColor);
-    const { selectionTime } = calculateDifficulty(gameState.level, performanceRating);
-    const timeBonus = Math.max(0, gameState.timeLeft / selectionTime);
-    
-    const similarityThreshold = 0.1 - (Math.min(gameState.level, 50) * 0.001);
-    const isExactMatch = difference < 0.01;
-    
-    const closeMatchLimit = gameState.level <= 50 ? 3 : 1;
-    const currentTenLevelBlock = Math.floor(gameState.level / 10);
-    
-    let newCloseMatches = closeMatches;
-    let newPerformanceRating = performanceRating;
-    let newComboMultiplier = comboMultiplier;
-    let gameOver = false;
-    let feedbackMessage = "";
-
-    if (levelStarted !== currentTenLevelBlock) {
-      newCloseMatches = 0;
+    console.log('Color selected:', selectedColor, 'Current level:', gameState.level);
+    // Prevent multiple clicks or processing while already handling a selection
+    if (!gameState.isPlaying || isProcessingSelection) {
+      console.log('Selection ignored: game not playing or already processing');
+      return;
     }
 
-    if (!isExactMatch) {
-      newCloseMatches++;
-      newPerformanceRating = Math.max(0.9, performanceRating - 0.02);
-      newComboMultiplier = 1;
-    } else {
-      newPerformanceRating = Math.min(1.1, performanceRating + 0.01);
-      newComboMultiplier = Math.min(5, comboMultiplier + 0.5);
-    }
-
-    if (!isExactMatch && newCloseMatches > closeMatchLimit) {
-      feedbackMessage = "Game Over! Too many close matches.";
-      gameOver = true;
-    } else if (difference >= similarityThreshold) {
-      feedbackMessage = "Game Over! Color mismatch.";
-      gameOver = true;
-    } else {
-      feedbackMessage = isExactMatch ? `Perfect! ${newComboMultiplier.toFixed(1)}x Combo!` : "Close enough!";
-    }
-
-    const accuracyPoints = Math.max(0, 100 - Math.round(difference * 1000));
-    const speedPoints = Math.round(timeBonus * 50);
-    const totalPoints = Math.round((accuracyPoints + speedPoints) * newComboMultiplier);
+    setIsProcessingSelection(true);
 
     try {
-      let newGameState;
-      if (gameOver) {
-        newGameState = {
-          ...gameState,
-          isPlaying: false,
-          score: gameState.score + totalPoints
-        };
-      } else {
-        const newLevel = gameState.level + 1;
-        const colors = await generateColorsWithWorker(newLevel, newPerformanceRating) as { target: string, options: string[] };
-        
-        // Check if the game is still playing before updating state
-        if (gameState.isPlaying) {
-          newGameState = {
-            ...gameState,
-            score: gameState.score + totalPoints,
-            level: newLevel,
-            timeLeft: 3, // viewTime
-            targetColor: colors.target,
-            options: colors.options
-          };
-        } else {
-          // If the game is no longer playing, don't update state
-          return;
-        }
+      const difference = calculateColorDifference(gameState.targetColor, selectedColor);
+      console.log('Color difference:', difference);
+
+      const { selectionTime } = calculateDifficulty(gameState.level, performanceRating);
+      const timeBonus = Math.max(0, gameState.timeLeft / selectionTime);
+      
+      const similarityThreshold = 0.1 - (Math.min(gameState.level, 50) * 0.001);
+      const isExactMatch = difference < 0.01;
+      
+      const closeMatchLimit = gameState.level <= 50 ? 3 : 1;
+      const currentTenLevelBlock = Math.floor(gameState.level / 10);
+      
+      let newCloseMatches = closeMatches;
+      let newPerformanceRating = performanceRating;
+      let newComboMultiplier = comboMultiplier;
+      let gameOver = false;
+      let feedbackMessage = "";
+
+      if (levelStarted !== currentTenLevelBlock) {
+        newCloseMatches = 0;
       }
 
-      setGameState(newGameState);
+      if (!isExactMatch) {
+        newCloseMatches++;
+        newPerformanceRating = Math.max(0.9, performanceRating - 0.02);
+        newComboMultiplier = 1;
+      } else {
+        newPerformanceRating = Math.min(1.1, performanceRating + 0.01);
+        newComboMultiplier = Math.min(5, comboMultiplier + 0.5);
+      }
+
+      if (!isExactMatch && newCloseMatches > closeMatchLimit) {
+        feedbackMessage = "Game Over! Too many close matches.";
+        gameOver = true;
+      } else if (difference >= similarityThreshold) {
+        feedbackMessage = "Game Over! Color mismatch.";
+        gameOver = true;
+      } else {
+        feedbackMessage = isExactMatch ? `Perfect! ${newComboMultiplier.toFixed(1)}x Combo!` : "Close enough!";
+      }
+
+      const accuracyPoints = Math.max(0, 100 - Math.round(difference * 1000));
+      const speedPoints = Math.round(timeBonus * 50);
+      const totalPoints = Math.round((accuracyPoints + speedPoints) * newComboMultiplier);
+
+      console.log('Updating game state. Game over:', gameOver);
+
+      setGameState(prevState => {
+        const newState = gameOver
+          ? {
+              ...prevState,
+              isPlaying: false,
+              score: prevState.score + totalPoints
+            }
+          : {
+              ...prevState,
+              score: prevState.score + totalPoints,
+              level: prevState.level + 1,
+              timeLeft: 3, // viewTime
+            };
+        console.log('New game state:', newState);
+        return newState;
+      });
+
       setExactMatch(isExactMatch);
       setLevelStarted(currentTenLevelBlock);
       setCloseMatches(newCloseMatches);
@@ -366,8 +365,21 @@ export function ColorMemoryGame() {
       setTimeout(() => setShowFeedback(false), 1000);
 
       if (gameOver) {
+        console.log('Game over, calling endGame');
         endGame(true);
       } else {
+        console.log('Generating new colors for next level');
+        const newColors = await generateColorsWithWorker(gameState.level + 1, newPerformanceRating) as { target: string, options: string[] };
+        console.log('New colors generated:', newColors);
+        setGameState(prevState => {
+          const updatedState = {
+            ...prevState,
+            targetColor: newColors.target,
+            options: newColors.options,
+          };
+          console.log('Updated game state with new colors:', updatedState);
+          return updatedState;
+        });
         setShowTarget(true);
       }
 
@@ -376,10 +388,13 @@ export function ColorMemoryGame() {
         description: `You earned ${totalPoints} points! (Accuracy: ${accuracyPoints}, Speed: ${speedPoints}${newComboMultiplier > 1 ? `, Combo: ${newComboMultiplier.toFixed(1)}x` : ''})`,
       });
     } catch (error) {
-      console.error("Error generating new colors:", error);
+      console.error("Error in handleColorSelect:", error);
       endGame(true);
+    } finally {
+      setIsProcessingSelection(false);
+      console.log('Color selection processing completed');
     }
-  }, [gameState, performanceRating, levelStarted, closeMatches, comboMultiplier, endGame, generateColorsWithWorker, memoizedToast]);
+  }, [gameState, isProcessingSelection, performanceRating, levelStarted, closeMatches, comboMultiplier, endGame, generateColorsWithWorker, memoizedToast]);
 
   const debouncedHandleColorSelect = useCallback(
     (selectedColor: string) => {
@@ -398,6 +413,7 @@ export function ColorMemoryGame() {
           <ColorSwatch
             key={color}
             color={color}
+            size="medium"
             onClick={() => debouncedHandleColorSelect(color)}
           />
         ))}
@@ -471,8 +487,8 @@ export function ColorMemoryGame() {
                 <ColorSwatch 
                   key={`target-${gameState.targetColor}`}
                   color={gameState.targetColor} 
-                  size="large" 
-                  className="w-64 h-64 sm:w-80 sm:h-80" 
+                  size="large"
+                  // We don't need to pass an onClick prop for the target color
                 />
               ) : (
                 renderColorSwatches()

@@ -1,23 +1,36 @@
-import React from "react"
+import React, { useState } from 'react';
 
 interface ColorSwatchProps {
-  color: string
-  size?: 'small' | 'large'
-  onClick?: () => void
-  className?: string
+  color: string;
+  onClick?: () => void;  // Make onClick optional
+  size?: 'small' | 'medium' | 'large';
+  className?: string;
 }
 
-export default function ColorSwatch({ color, size = 'small', onClick, className }: ColorSwatchProps) {
-  const sizeClasses = size === 'large' 
-    ? 'w-64 h-64 sm:w-80 sm:h-80' 
-    : 'w-24 h-24 sm:w-32 sm:h-32 md:w-40 md:h-40 lg:w-48 lg:h-48'
-  
+const ColorSwatch: React.FC<ColorSwatchProps> = ({ color, onClick, size = 'medium', className = '' }) => {
+  const [isClicked, setIsClicked] = useState(false);
+
+  const handleClick = () => {
+    setIsClicked(true);
+    onClick?.();  // Call onClick only if it's defined
+    setTimeout(() => setIsClicked(false), 300); // Reset after debounce period
+  };
+
+  const sizeClasses = {
+    small: 'h-20 w-20',
+    medium: 'h-22 w-22 sm:h-36 sm:w-36', // Adjusted for selection colors
+    large: 'h-64 w-64 sm:h-80 sm:w-80'
+  };
+
   return (
     <button
-      className={`${sizeClasses} ${className} rounded-lg shadow-lg sm:transition-transform sm:hover:scale-105 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500`}
+      className={`${sizeClasses[size]} rounded-lg transition-all duration-200 ${
+        isClicked ? 'scale-95 ring-4 ring-white' : 'hover:scale-105'
+      } ${className}`}
       style={{ backgroundColor: color }}
-      onClick={onClick}
-      aria-label={`Color: ${color}`}
+      onClick={handleClick}
     />
-  )
-}
+  );
+};
+
+export default ColorSwatch;
