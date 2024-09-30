@@ -48,23 +48,26 @@ export async function GET(request: NextRequest) {
 
 async function fetchLeaderboard(collection: Collection<Document>): Promise<LeaderboardEntry[]> {
   const leaderboardData = await collection
-    .find({})
-    .sort({ score: -1 })
-    .limit(10)
-    .project({ _id: 0, userId: 0, createdAt: 0 })
+    .aggregate([
+      { $sort: { score: -1 } },
+      { $group: { 
+        _id: "$username", 
+        score: { $first: "$score" },
+        level: { $first: "$level" }
+      }},
+      { $sort: { score: -1 } },
+      { $limit: 10 },
+      { $project: { _id: 0, username: "$_id", score: 1, level: 1 } }
+    ])
     .toArray();
 
   console.log('Fetched leaderboard data:', leaderboardData);
 
-  return leaderboardData.map((entry: Document) => ({
-    username: entry.username as string,
-    score: entry.score as number,
-    level: entry.level as number
-  }));
+  return leaderboardData as LeaderboardEntry[];
 }
 
 async function getUserRank(collection: Collection<Document>, username: string): Promise<number> {
-  const userScore = await collection.findOne({ username }, { projection: { score: 1 } });
+  const userScore = await collection.findOne({ username }, { sort: { score: -1 }, projection: { score: 1 } });
   if (!userScore) return 0;
 
   const rank = await collection.countDocuments({ score: { $gt: userScore.score } });
@@ -79,37 +82,35 @@ export async function POST(request: NextRequest) {
 
     const { username, score, level } = await request.json();
 
-    // Check if the user already exists
-    const existingUser = await collection.findOne({ username });
-
-    if (existingUser) {
-      // Update the score if it's higher than the existing one
-      if (score > existingUser.score) {
-        await collection.updateOne(
-          { username },
-          { $set: { score, level, updatedAt: new Date() } }
-        );
-      }
-    } else {
-      // Insert new user
-      await collection.insertOne({
-        username,
-        score,
-        level,
-        createdAt: new Date()
-      });
-    }
+    // Insert new score entry
+    await collection.insertOne({
+      username,
+      score,
+      level,
+      createdAt: new Date()
+    });
 
     // Invalidate cache on new score
     leaderboardCache = null;
 
-    // Calculate the user's rank based on their score
-    const rank = await collection.countDocuments({ score: { $gt: score } }) + 1;
+    // Calculate the user's rank based on their highest score
+    const rank = await collection.countDocuments({ 
+      $or: [
+        { score: { $gt: score } },
+        { score: score, username: { $lt: username } }
+      ]
+    }) + 1;
     const isTopTen = rank <= 10;
+
+    // Get the user's highest score
+    const highestScore = await collection.find({ username })
+      .sort({ score: -1 })
+      .limit(1)
+      .toArray();
 
     return NextResponse.json({ 
       message: "Score saved successfully", 
-      highestScore: score,
+      highestScore: highestScore[0]?.score || score,
       isTopTen,
       rank: rank
     }, { status: 201 });

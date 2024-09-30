@@ -25,7 +25,7 @@ export function Leaderboard({ localUserData, currentScore, showOnlyUserStats = f
 
   const fetchLeaderboard = useCallback(async () => {
     try {
-      const response = await fetch('/api/leaderboard')
+      const response = await fetch(`/api/leaderboard${localUserData ? `?username=${encodeURIComponent(localUserData.username)}` : ''}`)
       if (!response.ok) {
         throw new Error(`Failed to fetch leaderboard: ${response.status} ${response.statusText}`)
       }
@@ -80,7 +80,7 @@ export function Leaderboard({ localUserData, currentScore, showOnlyUserStats = f
           </TableHeader>
           <TableBody>
             {leaderboard.map((entry, index) => (
-              <TableRow key={index} className={getRankStyle(index)}>
+              <TableRow key={entry.username} className={getRankStyle(index)}>
                 <TableCell className="font-medium">
                   <div className="flex items-center space-x-2">
                     {getRankIcon(index)}
@@ -92,7 +92,7 @@ export function Leaderboard({ localUserData, currentScore, showOnlyUserStats = f
                 <TableCell className="text-right">{entry.level}</TableCell>
               </TableRow>
             ))}
-            {userEntry && !leaderboard.some(entry => entry.username === userEntry.username) && (
+            {userEntry && !leaderboard.some(entry => entry.username === userEntry.username) && userRank && (
               <TableRow>
                 <TableCell className="font-medium">
                   <div className="flex items-center space-x-2">
