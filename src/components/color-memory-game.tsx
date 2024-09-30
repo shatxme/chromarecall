@@ -17,6 +17,7 @@ import { Crown } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import type { GameState, LocalUserData } from "../types"
 import { calculateColorDifference } from "../lib/color-utils"
+import { debounce } from 'lodash';
 
 const ColorSwatch = dynamic(() => import('./color-swatch'))
 const ScoreDisplay = dynamic(() => import('./score-display'))
@@ -245,31 +246,40 @@ export function ColorMemoryGame() {
     }
   }, [showLeaderboard, localUserData, gameState.score, gameState.level, saveScoreInBackground]);
 
-  // Make sure this is placed after all the function declarations
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+
   useEffect(() => {
-    let timer: NodeJS.Timeout
+    const clearTimer = () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    };
+
     if (gameState.isPlaying && gameState.timeLeft > 0) {
-      timer = setInterval(() => {
+      clearTimer(); // Clear any existing timer
+      timerRef.current = setInterval(() => {
         setGameState(prev => ({
           ...prev,
           timeLeft: Math.max(0, prev.timeLeft - 1)
         }));
       }, 1000);
     } else if (gameState.isPlaying && gameState.timeLeft === 0) {
+      clearTimer();
       if (showTarget) {
-        setShowTarget(false)
-        const { selectionTime } = calculateDifficulty(gameState.level, performanceRating)
-        setGameState(prev => ({ ...prev, timeLeft: selectionTime }))
+        setShowTarget(false);
+        const { selectionTime } = calculateDifficulty(gameState.level, performanceRating);
+        setGameState(prev => ({ ...prev, timeLeft: selectionTime }));
       } else {
-        endGame(true)
+        endGame(true);
       }
     }
-    return () => {
-      if (timer) clearInterval(timer)
-    }
-  }, [gameState.isPlaying, gameState.timeLeft, showTarget, gameState.level, endGame, performanceRating])
+
+    return clearTimer;
+  }, [gameState.isPlaying, gameState.timeLeft, showTarget, gameState.level, endGame, performanceRating]);
 
   const handleColorSelect = useCallback(async (selectedColor: string) => {
+    console.log('Color selected:', selectedColor);
     // Prevent multiple clicks
     if (!gameState.isPlaying) return;
 
@@ -327,14 +337,21 @@ export function ColorMemoryGame() {
       } else {
         const newLevel = gameState.level + 1;
         const colors = await generateColorsWithWorker(newLevel, newPerformanceRating) as { target: string, options: string[] };
-        newGameState = {
-          ...gameState,
-          score: gameState.score + totalPoints,
-          level: newLevel,
-          timeLeft: 3, // viewTime
-          targetColor: colors.target,
-          options: colors.options
-        };
+        
+        // Check if the game is still playing before updating state
+        if (gameState.isPlaying) {
+          newGameState = {
+            ...gameState,
+            score: gameState.score + totalPoints,
+            level: newLevel,
+            timeLeft: 3, // viewTime
+            targetColor: colors.target,
+            options: colors.options
+          };
+        } else {
+          // If the game is no longer playing, don't update state
+          return;
+        }
       }
 
       setGameState(newGameState);
@@ -364,6 +381,15 @@ export function ColorMemoryGame() {
     }
   }, [gameState, performanceRating, levelStarted, closeMatches, comboMultiplier, endGame, generateColorsWithWorker, memoizedToast]);
 
+  const debouncedHandleColorSelect = useCallback(
+    (selectedColor: string) => {
+      debounce((color: string) => {
+        handleColorSelect(color);
+      }, 300, { leading: true, trailing: false })(selectedColor);
+    },
+    [handleColorSelect]
+  );
+
   const renderColorSwatches = useCallback(() => {
     const totalColors = Math.min(6, gameState.options.length);
     return (
@@ -372,12 +398,12 @@ export function ColorMemoryGame() {
           <ColorSwatch
             key={color}
             color={color}
-            onClick={() => handleColorSelect(color)}
+            onClick={() => debouncedHandleColorSelect(color)}
           />
         ))}
       </div>
     );
-  }, [gameState.options, handleColorSelect]);
+  }, [gameState.options, debouncedHandleColorSelect]);
 
   if (isLoading) {
     return <div className="flex justify-center items-center h-screen">Loading...</div>
