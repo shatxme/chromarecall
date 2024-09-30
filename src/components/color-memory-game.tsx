@@ -124,6 +124,17 @@ export function ColorMemoryGame() {
     setLocalUserData(userData)
   }, [])
 
+  const updateUserData = useCallback((newScore: number) => {
+    if (localUserData) {
+      const updatedUserData = { 
+        ...localUserData, 
+        highestScore: Math.max(localUserData.highestScore, newScore) 
+      }
+      localStorage.setItem('userData', JSON.stringify(updatedUserData))
+      setLocalUserData(updatedUserData)
+    }
+  }, [localUserData])
+
   const handleUsernameSubmit = useCallback(async () => {
     if (tempUsername.trim()) {
       // Check if username exists in the leaderboard
@@ -179,12 +190,13 @@ export function ColorMemoryGame() {
       }
 
       const result = await response.json();
-      // Update the game state with the new highest score and rank
+      // Update the game state and local storage with the new highest score
       setGameState(prev => ({
         ...prev,
         highScore: result.highestScore,
         rank: result.rank
       }));
+      updateUserData(result.highestScore);
     } catch (error) {
       memoizedToast({
         title: "Error",
@@ -195,7 +207,7 @@ export function ColorMemoryGame() {
     if (lost) {
       setShowLossDialog(true);
     }
-  }, [gameState.score, gameState.level, localUserData, memoizedToast, saveUserData])
+  }, [gameState.score, gameState.level, localUserData, memoizedToast, saveUserData, updateUserData])
 
   useEffect(() => {
     let timer: NodeJS.Timeout

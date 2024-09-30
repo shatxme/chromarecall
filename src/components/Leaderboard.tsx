@@ -34,6 +34,13 @@ export function Leaderboard({ localUserData, currentScore, showOnlyUserStats = f
       
       if (localUserData) {
         setUserRank(data.userRank)
+        // Update local storage with the latest high score from the server
+        const userEntry = data.leaderboard.find((entry: LeaderboardEntry) => entry.username === localUserData.username)
+        if (userEntry && userEntry.score > localUserData.highestScore) {
+          const updatedUserData = { ...localUserData, highestScore: userEntry.score }
+          localStorage.setItem('userData', JSON.stringify(updatedUserData))
+          // You might want to add a state update here if you're using this data elsewhere in the component
+        }
       }
     } catch (error) {
       console.error('Error fetching leaderboard:', error)

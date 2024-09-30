@@ -25,7 +25,8 @@ export async function GET(request: NextRequest) {
     // Check if we have a valid cache
     if (leaderboardCache && Date.now() - lastCacheTime < CACHE_DURATION) {
       const userRank = username ? await getUserRank(collection, username) : null;
-      return NextResponse.json({ leaderboard: leaderboardCache, userRank });
+      const userHighestScore = username ? await getUserHighestScore(collection, username) : null;
+      return NextResponse.json({ leaderboard: leaderboardCache, userRank, userHighestScore });
     }
 
     // If no cache or cache is stale, fetch from database
@@ -36,8 +37,9 @@ export async function GET(request: NextRequest) {
     lastCacheTime = Date.now();
 
     const userRank = username ? await getUserRank(collection, username) : null;
+    const userHighestScore = username ? await getUserHighestScore(collection, username) : null;
 
-    return NextResponse.json({ leaderboard, userRank });
+    return NextResponse.json({ leaderboard, userRank, userHighestScore });
   } catch (error: unknown) {
     return NextResponse.json({ 
       message: 'Error processing leaderboard request', 
@@ -72,6 +74,11 @@ async function getUserRank(collection: Collection<Document>, username: string): 
 
   const rank = await collection.countDocuments({ score: { $gt: userScore.score } });
   return rank + 1;
+}
+
+async function getUserHighestScore(collection: Collection<Document>, username: string): Promise<number> {
+  const userScore = await collection.findOne({ username }, { sort: { score: -1 }, projection: { score: 1 } });
+  return userScore ? userScore.score : 0;
 }
 
 export async function POST(request: NextRequest) {
