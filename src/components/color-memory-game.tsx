@@ -322,34 +322,21 @@ export function ColorMemoryGame() {
   }, [gameState, performanceRating, levelStarted, closeMatches, comboMultiplier, endGame, setExactMatch, setLevelStarted, setCloseMatches, setPerformanceRating, setComboMultiplier, setFeedbackText, setShowFeedback, setGameState, setShowTarget, generateColorsWithWorker, memoizedToast]);
 
   const renderColorSwatches = useCallback(() => {
-    const totalColors = Math.min(9, gameState.options.length);
-    const firstRowColors = Math.min(5, totalColors);
-    const secondRowColors = Math.max(0, totalColors - 5);
-
     return (
-      <div className="flex flex-col items-center gap-2 sm:gap-8">
-        <div className="flex justify-center gap-2 sm:gap-8 flex-wrap">
-          {gameState.options.slice(0, firstRowColors).map((color) => (
-            <ColorSwatch
-              key={color}
-              color={color}
-              onClick={() => handleColorSelect(color)}
-              className="w-[5.5rem] h-[5.5rem] sm:w-36 sm:h-36"
-            />
-          ))}
-        </div>
-        {secondRowColors > 0 && (
-          <div className="flex justify-center gap-2 sm:gap-8 flex-wrap">
-            {gameState.options.slice(5, 9).map((color) => (
-              <ColorSwatch
-                key={color}
-                color={color}
-                onClick={() => handleColorSelect(color)}
-                className="w-[5.5rem] h-[5.5rem] sm:w-36 sm:h-36"
-              />
-            ))}
-          </div>
-        )}
+      <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap sm:justify-center sm:gap-4">
+        {gameState.options.map((color, index) => (
+          <ColorSwatch
+            key={color}
+            color={color}
+            onClick={() => handleColorSelect(color)}
+            className={`
+              ${index === 3 ? 'col-start-1 row-start-2' : ''}
+              ${index === 6 ? 'col-start-1 row-start-3' : ''}
+              ${index >= 3 && index < 6 ? 'col-start-auto row-start-2' : ''}
+              ${index >= 6 ? 'col-start-auto row-start-3' : ''}
+            `}
+          />
+        ))}
       </div>
     );
   }, [gameState.options, handleColorSelect]);
@@ -421,7 +408,7 @@ export function ColorMemoryGame() {
                 key={`target-${gameState.targetColor}`}
                 color={gameState.targetColor} 
                 size="large" 
-                className="w-56 h-56 sm:w-72 sm:h-72" 
+                className="w-64 h-64 sm:w-80 sm:h-80" 
               />
             ) : (
               renderColorSwatches()
