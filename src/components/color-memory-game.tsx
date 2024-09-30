@@ -222,7 +222,9 @@ export function ColorMemoryGame() {
         endGame(true)
       }
     }
-    return () => clearInterval(timer)
+    return () => {
+      if (timer) clearInterval(timer)
+    }
   }, [gameState.isPlaying, gameState.timeLeft, showTarget, gameState.level, endGame, performanceRating])
 
   const startGame = useCallback(async () => {
@@ -247,6 +249,12 @@ export function ColorMemoryGame() {
   }, [generateColorsWithWorker]);
 
   const handleColorSelect = useCallback(async (selectedColor: string) => {
+    // Prevent multiple clicks
+    if (!gameState.isPlaying) return;
+
+    // Immediately set isPlaying to false to prevent multiple selections
+    setGameState(prev => ({ ...prev, isPlaying: false }));
+
     const difference = calculateColorDifference(gameState.targetColor, selectedColor);
     const { selectionTime } = calculateDifficulty(gameState.level, performanceRating);
     const timeBonus = Math.max(0, gameState.timeLeft / selectionTime);
@@ -255,7 +263,6 @@ export function ColorMemoryGame() {
     const isExactMatch = difference < 0.01;
     setExactMatch(isExactMatch);
     
-    // Check if we've exceeded the close match limit
     const closeMatchLimit = gameState.level <= 50 ? 3 : 1;
     const currentTenLevelBlock = Math.floor(gameState.level / 10);
     
@@ -278,9 +285,9 @@ export function ColorMemoryGame() {
     
     if (!isExactMatch) {
       setCloseMatches(prev => prev + 1);
-      setPerformanceRating(prev => Math.max(0.9, prev - 0.02)); // Slightly decrease performance rating
+      setPerformanceRating(prev => Math.max(0.9, prev - 0.02));
     } else {
-      setPerformanceRating(prev => Math.min(1.1, prev + 0.01)); // Increase performance rating
+      setPerformanceRating(prev => Math.min(1.1, prev + 0.01));
     }
     
     let newComboMultiplier = comboMultiplier;
@@ -289,7 +296,7 @@ export function ColorMemoryGame() {
       setComboMultiplier(newComboMultiplier);
     } else {
       newComboMultiplier = 1;
-      setComboMultiplier(1); // Reset multiplier on close match
+      setComboMultiplier(1);
     }
     
     const accuracyPoints = Math.max(0, 100 - Math.round(difference * 1000));
@@ -302,29 +309,36 @@ export function ColorMemoryGame() {
     setTimeout(() => setShowFeedback(false), 1000);
 
     const newLevel = gameState.level + 1;
-    const colors = await generateColorsWithWorker(newLevel, performanceRating) as { target: string, options: string[] };
     
-    setGameState(prev => ({
-      ...prev,
-      score: prev.score + totalPoints,
-      level: newLevel,
-      timeLeft: 3, // viewTime
-      targetColor: colors.target,
-      options: colors.options
-    }));
-    
-    setShowTarget(true);
-    
-    memoizedToast({
-      title: "Color Selected!",
-      description: `You earned ${totalPoints} points! (Accuracy: ${accuracyPoints}, Speed: ${speedPoints}${newComboMultiplier > 1 ? `, Combo: ${newComboMultiplier.toFixed(1)}x` : ''})`,
-    });
-  }, [gameState, performanceRating, levelStarted, closeMatches, comboMultiplier, endGame, setExactMatch, setLevelStarted, setCloseMatches, setPerformanceRating, setComboMultiplier, setFeedbackText, setShowFeedback, setGameState, setShowTarget, generateColorsWithWorker, memoizedToast]);
+    try {
+      const colors = await generateColorsWithWorker(newLevel, performanceRating) as { target: string, options: string[] };
+      
+      setGameState(prev => ({
+        ...prev,
+        score: prev.score + totalPoints,
+        level: newLevel,
+        timeLeft: 3, // viewTime
+        targetColor: colors.target,
+        options: colors.options,
+        isPlaying: true // Re-enable playing
+      }));
+      
+      setShowTarget(true);
+      
+      memoizedToast({
+        title: "Color Selected!",
+        description: `You earned ${totalPoints} points! (Accuracy: ${accuracyPoints}, Speed: ${speedPoints}${newComboMultiplier > 1 ? `, Combo: ${newComboMultiplier.toFixed(1)}x` : ''})`,
+      });
+    } catch (error) {
+      console.error("Error generating new colors:", error);
+      endGame(true);
+    }
+  }, [gameState, performanceRating, levelStarted, closeMatches, comboMultiplier, endGame, setExactMatch, setLevelStarted, setCloseMatches, setPerformanceRating, setComboMultiplier, setFeedbackText, setShowFeedback, generateColorsWithWorker, memoizedToast]);
 
   const renderColorSwatches = useCallback(() => {
     const totalColors = Math.min(6, gameState.options.length);
     return (
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 sm:gap-6">
+      <div className="grid grid-cols-3 gap-4 sm:gap-6">
         {gameState.options.slice(0, totalColors).map((color) => (
           <ColorSwatch
             key={color}
