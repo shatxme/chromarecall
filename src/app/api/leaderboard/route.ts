@@ -52,7 +52,7 @@ async function fetchLeaderboard(collection: Collection<Document>): Promise<Leade
       { $sort: { score: -1 } },
       { $group: { 
         _id: "$username", 
-        score: { $first: "$score" },
+        score: { $max: "$score" },
         level: { $first: "$level" }
       }},
       { $sort: { score: -1 } },

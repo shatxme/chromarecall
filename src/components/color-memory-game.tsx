@@ -428,7 +428,7 @@ export function ColorMemoryGame() {
       )}
       
       <Dialog open={showLossDialog} onOpenChange={setShowLossDialog}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-[425px] z-50">
           <DialogHeader>
             <DialogTitle className="text-2xl font-bold text-yellow-600">Game Over!</DialogTitle>
             <DialogDescription>
@@ -442,11 +442,6 @@ export function ColorMemoryGame() {
               Score: {gameState.score}
             </p>
             <p className="text-xl text-center">Level Reached: {gameState.level}</p>
-            <Leaderboard 
-              localUserData={localUserData} 
-              currentScore={gameState.score} 
-              showOnlyUserStats={true} 
-            />
             {showUsernameInput && (
               <div>
                 <p className="text-sm text-gray-600 mb-2">Enter a username to save your score:</p>
@@ -474,7 +469,7 @@ export function ColorMemoryGame() {
       </Dialog>
 
       <Dialog open={showLeaderboard} onOpenChange={setShowLeaderboard}>
-        <DialogContent className="sm:max-w-[425px] max-h-[80vh] overflow-y-auto overflow-x-hidden">
+        <DialogContent className="sm:max-w-[425px] max-h-[80vh] overflow-y-auto overflow-x-hidden z-50">
           <DialogHeader>
             <DialogTitle className="text-2xl font-bold text-yellow-600">Champions</DialogTitle>
             <DialogDescription className="text-gray-600">
