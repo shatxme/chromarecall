@@ -154,12 +154,31 @@ export function ColorMemoryGame() {
           highScore: event.data.highestScore,
         }));
         updateUserData(event.data.highestScore);
-        // Force a refresh of the leaderboard
-        setShowLeaderboard(false);
-        setTimeout(() => setShowLeaderboard(true), 100);
+        // Remove the force refresh of the leaderboard
       }
     };
   }, [memoizedToast, updateUserData]);
+
+  const startGame = useCallback(async () => {
+    setIsLoading(true);
+    const colors = await generateColorsWithWorker(1, 1) as { target: string, options: string[] };
+    setGameState(prev => ({
+      ...prev,
+      isPlaying: true,
+      score: 0,
+      level: 1,
+      timeLeft: 3, // viewTime
+      targetColor: colors.target,
+      options: colors.options
+    }));
+    setShowTarget(true);
+    setIsLoading(false);
+    setShowLossDialog(false);
+    setComboMultiplier(1);
+    setCloseMatches(0);
+    setLevelStarted(0);
+    setPerformanceRating(1);
+  }, [generateColorsWithWorker]);
 
   const handleUsernameSubmit = useCallback(async () => {
     if (tempUsername.trim()) {
@@ -178,8 +197,11 @@ export function ColorMemoryGame() {
       
       // Save score immediately after setting username
       saveScoreInBackground(tempUsername, gameState.score, gameState.level);
+
+      // Start a new game instead of opening the leaderboard
+      startGame();
     }
-  }, [tempUsername, gameState.score, gameState.level, saveUserData, saveScoreInBackground]);
+  }, [tempUsername, gameState.score, gameState.level, saveUserData, saveScoreInBackground, startGame]);
 
   const endGame = useCallback((lost = false) => {
     setGameState(prev => {
@@ -211,6 +233,18 @@ export function ColorMemoryGame() {
     // setTimeout(() => setShowLeaderboard(true), 500);
   }, [gameState.score, gameState.level, localUserData, memoizedToast, saveScoreInBackground]);
 
+  // Update the openLeaderboard function
+  const openLeaderboard = useCallback(() => {
+    if (!showLeaderboard) {
+      setShowLeaderboard(true);
+      // Force a refresh of the leaderboard
+      if (localUserData) {
+        saveScoreInBackground(localUserData.username, gameState.score, gameState.level);
+      }
+    }
+  }, [showLeaderboard, localUserData, gameState.score, gameState.level, saveScoreInBackground]);
+
+  // Make sure this is placed after all the function declarations
   useEffect(() => {
     let timer: NodeJS.Timeout
     if (gameState.isPlaying && gameState.timeLeft > 0) {
@@ -233,27 +267,6 @@ export function ColorMemoryGame() {
       if (timer) clearInterval(timer)
     }
   }, [gameState.isPlaying, gameState.timeLeft, showTarget, gameState.level, endGame, performanceRating])
-
-  const startGame = useCallback(async () => {
-    setIsLoading(true);
-    const colors = await generateColorsWithWorker(1, 1) as { target: string, options: string[] };
-    setGameState(prev => ({
-      ...prev,
-      isPlaying: true,
-      score: 0,
-      level: 1,
-      timeLeft: 3, // viewTime
-      targetColor: colors.target,
-      options: colors.options
-    }));
-    setShowTarget(true);
-    setIsLoading(false);
-    setShowLossDialog(false);
-    setComboMultiplier(1);
-    setCloseMatches(0);
-    setLevelStarted(0);
-    setPerformanceRating(1);
-  }, [generateColorsWithWorker]);
 
   const handleColorSelect = useCallback(async (selectedColor: string) => {
     // Prevent multiple clicks
@@ -364,14 +377,6 @@ export function ColorMemoryGame() {
       </div>
     );
   }, [gameState.options, handleColorSelect]);
-
-  const openLeaderboard = useCallback(() => {
-    setShowLeaderboard(true);
-    // Force a refresh of the leaderboard
-    if (localUserData) {
-      saveScoreInBackground(localUserData.username, gameState.score, gameState.level);
-    }
-  }, [localUserData, gameState.score, gameState.level, saveScoreInBackground]);
 
   if (isLoading) {
     return <div className="flex justify-center items-center h-screen">Loading...</div>
