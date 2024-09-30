@@ -102,7 +102,6 @@ export function ColorMemoryGame() {
   const [closeMatches, setCloseMatches] = useState(0);
   const [levelStarted, setLevelStarted] = useState(0);
   const [comboMultiplier, setComboMultiplier] = useState(1);
-  const [optimisticHighScore, setOptimisticHighScore] = useState<number | null>(null);
 
   const workerRef = useRef<Worker | null>(null);
 
@@ -188,7 +187,6 @@ export function ColorMemoryGame() {
       setIsNewHighScore(newHighScore);
       
       if (newHighScore) {
-        setOptimisticHighScore(prev.score);
         memoizedToast({
           title: "New High Score!",
           description: `Congratulations! You've set a new high score of ${prev.score} points!`,
@@ -209,8 +207,8 @@ export function ColorMemoryGame() {
       setShowLossDialog(true);
     }
 
-    // Show leaderboard after saving score
-    setTimeout(() => setShowLeaderboard(true), 500);
+    // Remove the automatic opening of the leaderboard
+    // setTimeout(() => setShowLeaderboard(true), 500);
   }, [gameState.score, gameState.level, localUserData, memoizedToast, saveScoreInBackground]);
 
   useEffect(() => {
@@ -255,7 +253,6 @@ export function ColorMemoryGame() {
     setCloseMatches(0);
     setLevelStarted(0);
     setPerformanceRating(1);
-    setOptimisticHighScore(null); // Reset optimistic high score
   }, [generateColorsWithWorker]);
 
   const handleColorSelect = useCallback(async (selectedColor: string) => {
@@ -368,6 +365,14 @@ export function ColorMemoryGame() {
     );
   }, [gameState.options, handleColorSelect]);
 
+  const openLeaderboard = useCallback(() => {
+    setShowLeaderboard(true);
+    // Force a refresh of the leaderboard
+    if (localUserData) {
+      saveScoreInBackground(localUserData.username, gameState.score, gameState.level);
+    }
+  }, [localUserData, gameState.score, gameState.level, saveScoreInBackground]);
+
   if (isLoading) {
     return <div className="flex justify-center items-center h-screen">Loading...</div>
   }
@@ -376,7 +381,7 @@ export function ColorMemoryGame() {
     <div className="p-2 sm:p-4 pb-4 sm:pb-6 relative">
       <div className="absolute top-2 sm:top-4 left-2 sm:left-4 right-2 sm:right-4 flex justify-between items-center">
         <Button 
-          onClick={() => setShowLeaderboard(true)} 
+          onClick={openLeaderboard} 
           size="sm" 
           className="h-8 text-xs sm:text-sm sm:h-10 bg-gradient-to-r from-yellow-400 to-yellow-600 hover:from-yellow-500 hover:to-yellow-700 text-white font-bold transition-all duration-300 transform hover:scale-105 shadow-md hover:shadow-lg"
         >
@@ -466,8 +471,7 @@ export function ColorMemoryGame() {
             <p className="text-xl text-center">Level Reached: {gameState.level}</p>
             {isNewHighScore && (
               <p className="text-lg text-center text-green-600">
-                New High Score: {optimisticHighScore || gameState.score}
-                {optimisticHighScore && <span className="text-xs ml-2">(Saving...)</span>}
+                New High Score: {gameState.score}
               </p>
             )}
             {showUsernameInput && (
