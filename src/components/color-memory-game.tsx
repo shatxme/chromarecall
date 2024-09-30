@@ -65,6 +65,9 @@ function calculateDifficulty(level: number, performanceRating: number) {
   return { colorCount, similarity, viewTime, selectionTime };
 }
 
+// Create a separate worker for score saving
+const scoreSavingWorker = new Worker(new URL('../workers/scoreSavingWorker.ts', import.meta.url));
+
 export function ColorMemoryGame() {
   const [localUserData, setLocalUserData] = useState<LocalUserData | null>(null)
   const [showUsernameInput, setShowUsernameInput] = useState(false)
@@ -99,6 +102,7 @@ export function ColorMemoryGame() {
   const [closeMatches, setCloseMatches] = useState(0);
   const [levelStarted, setLevelStarted] = useState(0);
   const [comboMultiplier, setComboMultiplier] = useState(1);
+  const [optimisticHighScore, setOptimisticHighScore] = useState<number | null>(null);
 
   const workerRef = useRef<Worker | null>(null);
 
@@ -152,12 +156,33 @@ export function ColorMemoryGame() {
     }
   }, [tempUsername, gameState.score, saveUserData])
 
-  const endGame = useCallback(async (lost = false) => {
+  const saveScoreInBackground = useCallback((username: string, score: number, level: number) => {
+    scoreSavingWorker.postMessage({ username, score, level });
+    scoreSavingWorker.onmessage = (event) => {
+      if (event.data.error) {
+        console.error('Failed to save score:', event.data.error);
+        memoizedToast({
+          title: "Error",
+          description: "Failed to save your score. Please try again.",
+        });
+      } else {
+        setGameState(prev => ({
+          ...prev,
+          highScore: event.data.highestScore,
+          rank: event.data.rank
+        }));
+        updateUserData(event.data.highestScore);
+      }
+    };
+  }, [memoizedToast, updateUserData]);
+
+  const endGame = useCallback((lost = false) => {
     setGameState(prev => {
       const newHighScore = prev.score > (localUserData?.highestScore || 0);
       setIsNewHighScore(newHighScore);
       
       if (newHighScore) {
+        setOptimisticHighScore(prev.score);
         memoizedToast({
           title: "New High Score!",
           description: `Congratulations! You've set a new high score of ${prev.score} points!`,
@@ -169,45 +194,15 @@ export function ColorMemoryGame() {
 
     if (!localUserData) {
       setShowUsernameInput(true)
-    } else if (gameState.score > (localUserData.highestScore || 0)) {
-      saveUserData(localUserData.username, gameState.score)
-    }
-
-    try {
-      const response = await fetch('/api/leaderboard', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          username: localUserData?.username || 'Anonymous',
-          score: gameState.score,
-          level: gameState.level,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to save score');
-      }
-
-      const result = await response.json();
-      // Update the game state and local storage with the new highest score
-      setGameState(prev => ({
-        ...prev,
-        highScore: result.highestScore,
-        rank: result.rank
-      }));
-      updateUserData(result.highestScore);
-    } catch (error) {
-      memoizedToast({
-        title: "Error",
-        description: "Failed to save your score. Please try again.",
-      });
+    } else {
+      // Save score in the background
+      saveScoreInBackground(localUserData.username, gameState.score, gameState.level);
     }
 
     if (lost) {
       setShowLossDialog(true);
     }
-  }, [gameState.score, gameState.level, localUserData, memoizedToast, saveUserData, updateUserData])
+  }, [gameState.score, gameState.level, localUserData, memoizedToast, saveScoreInBackground]);
 
   useEffect(() => {
     let timer: NodeJS.Timeout
@@ -451,9 +446,15 @@ export function ColorMemoryGame() {
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <p className="text-2xl font-bold text-center">
-              Score: {gameState.score}
+              Your Score: {gameState.score}
             </p>
             <p className="text-xl text-center">Level Reached: {gameState.level}</p>
+            {isNewHighScore && (
+              <p className="text-lg text-center text-green-600">
+                New High Score: {optimisticHighScore || gameState.score}
+                {optimisticHighScore && <span className="text-xs ml-2">(Saving...)</span>}
+              </p>
+            )}
             {showUsernameInput && (
               <div>
                 <p className="text-sm text-gray-600 mb-2">Enter a username to save your score:</p>

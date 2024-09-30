@@ -14,18 +14,16 @@ type LeaderboardEntry = {
 interface LeaderboardProps {
   localUserData: LocalUserData | null;
   currentScore?: number;
-  showOnlyUserStats?: boolean;
 }
 
-export function Leaderboard({ localUserData, currentScore, showOnlyUserStats = false }: LeaderboardProps) {
+export function Leaderboard({ localUserData, currentScore }: LeaderboardProps) {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [userRank, setUserRank] = useState<number | null>(null)
 
   const fetchLeaderboard = useCallback(async () => {
     try {
-      const response = await fetch(`/api/leaderboard${localUserData ? `?username=${encodeURIComponent(localUserData.username)}` : ''}`)
+      const response = await fetch('/api/leaderboard')
       if (!response.ok) {
         throw new Error(`Failed to fetch leaderboard: ${response.status} ${response.statusText}`)
       }
@@ -33,13 +31,10 @@ export function Leaderboard({ localUserData, currentScore, showOnlyUserStats = f
       setLeaderboard(data.leaderboard)
       
       if (localUserData) {
-        setUserRank(data.userRank)
-        // Update local storage with the latest high score from the server
         const userEntry = data.leaderboard.find((entry: LeaderboardEntry) => entry.username === localUserData.username)
         if (userEntry && userEntry.score > localUserData.highestScore) {
           const updatedUserData = { ...localUserData, highestScore: userEntry.score }
           localStorage.setItem('userData', JSON.stringify(updatedUserData))
-          // You might want to add a state update here if you're using this data elsewhere in the component
         }
       }
     } catch (error) {
@@ -62,16 +57,9 @@ export function Leaderboard({ localUserData, currentScore, showOnlyUserStats = f
     return <div>Error: {error}</div>
   }
 
-  if (showOnlyUserStats && localUserData) {
-    return (
-      <div className="text-center">
-        <p className="font-semibold text-lg">Your All-Time Highest Score: {localUserData.highestScore}</p>
-        {userRank && <p className="font-semibold text-lg">Your Current Rank: {userRank}</p>}
-      </div>
-    )
-  }
-
-  const userEntry = localUserData && leaderboard.find(entry => entry.username === localUserData.username)
+  const userRank = localUserData 
+    ? leaderboard.findIndex(entry => entry.username === localUserData.username) + 1 
+    : null;
 
   return (
     <div className="overflow-x-hidden">
@@ -99,25 +87,13 @@ export function Leaderboard({ localUserData, currentScore, showOnlyUserStats = f
                 <TableCell className="text-right">{entry.level}</TableCell>
               </TableRow>
             ))}
-            {userEntry && !leaderboard.some(entry => entry.username === userEntry.username) && userRank && (
-              <TableRow>
-                <TableCell className="font-medium">
-                  <div className="flex items-center space-x-2">
-                    <span>{userRank}</span>
-                  </div>
-                </TableCell>
-                <TableCell>{userEntry.username}</TableCell>
-                <TableCell className="text-right">{userEntry.score}</TableCell>
-                <TableCell className="text-right">{userEntry.level}</TableCell>
-              </TableRow>
-            )}
           </TableBody>
         </Table>
       </div>
-      {localUserData && userRank && (
+      {localUserData && (
         <div className="mt-4 text-center">
           <p className="font-semibold">Your All-Time Highest Score: {localUserData.highestScore}</p>
-          <p className="font-semibold">Your Current Rank: {userRank}</p>
+          {userRank && <p className="font-semibold">Your Current Rank: {userRank}</p>}
         </div>
       )}
     </div>
