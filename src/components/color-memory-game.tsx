@@ -17,7 +17,9 @@ import { Crown } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import type { GameState, LocalUserData } from "../types"
 import { calculateColorDifference } from "../lib/color-utils"
-import { debounce } from 'lodash';
+
+// Remove the debounce import
+// import { debounce } from 'lodash';
 
 const ColorSwatch = dynamic(() => import('./color-swatch'))
 const ScoreDisplay = dynamic(() => import('./score-display'))
@@ -163,25 +165,49 @@ export function ColorMemoryGame() {
   }, [memoizedToast, updateUserData]);
 
   const startGame = useCallback(async () => {
+    console.log('Starting game...');
     setIsLoading(true);
-    const colors = await generateColorsWithWorker(1, 1) as { target: string, options: string[] };
-    setGameState(prev => ({
-      ...prev,
-      isPlaying: true,
-      score: 0,
-      level: 1,
-      timeLeft: 3, // viewTime
-      targetColor: colors.target,
-      options: colors.options
-    }));
-    setShowTarget(true);
-    setIsLoading(false);
-    setShowLossDialog(false);
-    setComboMultiplier(1);
-    setCloseMatches(0);
-    setLevelStarted(0);
-    setPerformanceRating(1);
-  }, [generateColorsWithWorker]);
+    try {
+      console.log('Generating initial colors...');
+      const colors = await generateColorsWithWorker(1, 1) as { target: string, options: string[] };
+      console.log('Initial colors generated:', colors);
+      
+      console.log('Updating game state...');
+      setGameState(prev => {
+        const newState = {
+          ...prev,
+          isPlaying: true,
+          score: 0,
+          level: 1,
+          timeLeft: 3, // viewTime
+          targetColor: colors.target,
+          options: colors.options
+        };
+        console.log('New game state:', newState);
+        return newState;
+      });
+      
+      console.log('Setting up game parameters...');
+      setShowTarget(true);
+      setComboMultiplier(1);
+      setCloseMatches(0);
+      setLevelStarted(0);
+      setPerformanceRating(1);
+      setShowLossDialog(false);
+      
+      console.log('Game state initialized');
+    } catch (error) {
+      console.error('Error starting game:', error);
+      memoizedToast({
+        title: "Error",
+        description: "Failed to start the game. Please try again.",
+      });
+    } finally {
+      console.log('Setting isLoading to false');
+      setIsLoading(false);
+      console.log('Start game process completed');
+    }
+  }, [generateColorsWithWorker, memoizedToast]);
 
   const handleUsernameSubmit = useCallback(async () => {
     if (tempUsername.trim()) {
@@ -250,6 +276,7 @@ export function ColorMemoryGame() {
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
+    console.log('Timer effect triggered:', { isPlaying: gameState.isPlaying, timeLeft: gameState.timeLeft, showTarget });
     const clearTimer = () => {
       if (timerRef.current) {
         clearInterval(timerRef.current);
@@ -258,6 +285,7 @@ export function ColorMemoryGame() {
     };
 
     if (gameState.isPlaying && gameState.timeLeft > 0) {
+      console.log('Starting timer');
       clearTimer(); // Clear any existing timer
       timerRef.current = setInterval(() => {
         setGameState(prev => ({
@@ -266,12 +294,15 @@ export function ColorMemoryGame() {
         }));
       }, 1000);
     } else if (gameState.isPlaying && gameState.timeLeft === 0) {
+      console.log('Timer reached zero');
       clearTimer();
       if (showTarget) {
+        console.log('Hiding target, showing color options');
         setShowTarget(false);
         const { selectionTime } = calculateDifficulty(gameState.level, performanceRating);
         setGameState(prev => ({ ...prev, timeLeft: selectionTime }));
       } else {
+        console.log('Time up, ending game');
         endGame(true);
       }
     }
@@ -281,7 +312,6 @@ export function ColorMemoryGame() {
 
   const handleColorSelect = useCallback(async (selectedColor: string) => {
     console.log('Color selected:', selectedColor, 'Current level:', gameState.level);
-    // Prevent multiple clicks or processing while already handling a selection
     if (!gameState.isPlaying || isProcessingSelection) {
       console.log('Selection ignored: game not playing or already processing');
       return;
@@ -337,22 +367,24 @@ export function ColorMemoryGame() {
 
       console.log('Updating game state. Game over:', gameOver);
 
-      setGameState(prevState => {
-        const newState = gameOver
-          ? {
-              ...prevState,
-              isPlaying: false,
-              score: prevState.score + totalPoints
-            }
-          : {
-              ...prevState,
-              score: prevState.score + totalPoints,
-              level: prevState.level + 1,
-              timeLeft: 3, // viewTime
-            };
-        console.log('New game state:', newState);
-        return newState;
-      });
+      if (gameOver) {
+        console.log('Game over, calling endGame');
+        endGame(true);
+      } else {
+        console.log('Generating new colors for next level');
+        const newColors = await generateColorsWithWorker(gameState.level + 1, newPerformanceRating) as { target: string, options: string[] };
+        console.log('New colors generated:', newColors);
+        setGameState(prevState => ({
+          ...prevState,
+          level: prevState.level + 1,
+          score: prevState.score + totalPoints,
+          targetColor: newColors.target,
+          options: newColors.options,
+          timeLeft: 3, // viewTime
+        }));
+        setShowTarget(true);
+        setIsProcessingSelection(false); // Reset processing flag after successful selection
+      }
 
       setExactMatch(isExactMatch);
       setLevelStarted(currentTenLevelBlock);
@@ -363,25 +395,6 @@ export function ColorMemoryGame() {
       setShowFeedback(true);
       
       setTimeout(() => setShowFeedback(false), 1000);
-
-      if (gameOver) {
-        console.log('Game over, calling endGame');
-        endGame(true);
-      } else {
-        console.log('Generating new colors for next level');
-        const newColors = await generateColorsWithWorker(gameState.level + 1, newPerformanceRating) as { target: string, options: string[] };
-        console.log('New colors generated:', newColors);
-        setGameState(prevState => {
-          const updatedState = {
-            ...prevState,
-            targetColor: newColors.target,
-            options: newColors.options,
-          };
-          console.log('Updated game state with new colors:', updatedState);
-          return updatedState;
-        });
-        setShowTarget(true);
-      }
 
       memoizedToast({
         title: "Color Selected!",
@@ -398,31 +411,52 @@ export function ColorMemoryGame() {
 
   const debouncedHandleColorSelect = useCallback(
     (selectedColor: string) => {
-      debounce((color: string) => {
-        handleColorSelect(color);
-      }, 300, { leading: true, trailing: false })(selectedColor);
+      if (!isProcessingSelection) {
+        handleColorSelect(selectedColor);
+      }
     },
-    [handleColorSelect]
+    [handleColorSelect, isProcessingSelection]
   );
 
   const renderColorSwatches = useCallback(() => {
     const totalColors = Math.min(6, gameState.options.length);
+    console.log('Rendering color swatches:', gameState.options.slice(0, totalColors));
     return (
-      <div className="grid grid-cols-3 gap-3 sm:gap-4 justify-center max-w-xs sm:max-w-sm md:max-w-md mx-auto">
+      <div className="grid grid-cols-3 gap-3 sm:gap-4 md:gap-6 lg:gap-8 justify-center max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg xl:max-w-xl mx-auto">
         {gameState.options.slice(0, totalColors).map((color) => (
           <ColorSwatch
             key={color}
             color={color}
             size="medium"
-            onClick={() => debouncedHandleColorSelect(color)}
+            onClick={() => {
+              console.log('ColorSwatch in ColorMemoryGame clicked:', color);
+              debouncedHandleColorSelect(color);
+            }}
           />
         ))}
       </div>
     );
   }, [gameState.options, debouncedHandleColorSelect]);
 
+  useEffect(() => {
+    console.log('Game state updated:', gameState);
+  }, [gameState]);
+
+  useEffect(() => {
+    console.log('Show target:', showTarget);
+  }, [showTarget]);
+
+  useEffect(() => {
+    console.log('isLoading changed:', isLoading);
+  }, [isLoading]);
+
   if (isLoading) {
-    return <div className="flex justify-center items-center h-screen">Loading...</div>
+    return (
+      <div className="flex flex-col justify-center items-center h-screen">
+        <div>Loading...</div>
+        <div>Game State: {JSON.stringify(gameState)}</div>
+      </div>
+    );
   }
 
   return (
