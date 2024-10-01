@@ -137,7 +137,7 @@ function generateSimilarColor(baseColor: string, similarity: number): string {
 
   const newHue = (h + (Math.random() * 2 - 1) * hueRange + 360) % 360;
   const newSaturation = Math.max(0, Math.min(100, s + (Math.random() * 2 - 1) * saturationRange));
-  const newLightness = Math.max(0, Math.min(100, l + (Math.random() * 2 - 1) * lightnessRange));
+  const newLightness = Math.max(0, Math.min(80, l + (Math.random() * 2 - 1) * lightnessRange)); // Limited lightness to 80
 
   return hslToHex(newHue, newSaturation, newLightness);
 }
@@ -146,13 +146,13 @@ function generateDistinctColor(baseColor: string, similarity: number): string {
   const [h, s, l] = hex2hsl(baseColor);
   const hueShift = 180 + (Math.random() - 0.5) * 60; // Opposite hue with some variation
   const newHue = (h + hueShift) % 360;
-  const newSaturation = Math.max(20, Math.min(80, s + (Math.random() - 0.5) * 40));
-  const newLightness = Math.max(20, Math.min(80, l + (Math.random() - 0.5) * 40));
+  const newSaturation = Math.max(20, Math.min(80, s + (Math.random() - 0.5) * 40)); // Limited saturation between 20 and 80
+  const newLightness = Math.max(20, Math.min(80, l + (Math.random() - 0.5) * 40)); // Limited lightness to 80
   
   // Use similarity to adjust the distinctness
   const adjustedHue = (newHue + (1 - similarity) * 180) % 360;
   const adjustedSaturation = Math.max(0, Math.min(100, newSaturation + (1 - similarity) * 50));
-  const adjustedLightness = Math.max(0, Math.min(100, newLightness + (1 - similarity) * 50));
+  const adjustedLightness = Math.max(0, Math.min(80, newLightness + (1 - similarity) * 50)); // Ensured lightness does not exceed 80
   
   return hslToHex(adjustedHue, adjustedSaturation, adjustedLightness);
 }

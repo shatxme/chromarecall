@@ -16,7 +16,7 @@ import dynamic from 'next/dynamic'
 import { Crown } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import type { GameState, LocalUserData } from "../types"
-import { calculateColorDifference } from "../lib/color-utils"
+import { calculateColorDifference, calculateDifficulty } from "../lib/color-utils"
 
 // Remove the debounce import
 // import { debounce } from 'lodash';
@@ -32,41 +32,6 @@ const AttractiveButton: React.FC<React.ButtonHTMLAttributes<HTMLButtonElement>> 
     {...props}
   />
 );
-
-function calculateDifficulty(level: number, performanceRating: number) {
-  // Color count calculation
-  const baseColorCount = 3;
-  const additionalColors = Math.floor(level / 10);
-  const colorCount = Math.min(10, baseColorCount + additionalColors);
-
-  // Similarity calculation
-  let similarity;
-  if (level <= 10) {
-    similarity = 0.7 + (level * 0.01); // Start at 0.7, increase by 0.01 per level for first 10 levels
-  } else if (level <= 30) {
-    similarity = 0.8 + ((level - 10) * 0.005); // Gradual increase from level 11 to 30
-  } else if (level <= 50) {
-    similarity = 0.9 + ((level - 30) * 0.003); // Steeper increase from level 31 to 50
-  } else {
-    similarity = 0.96 + ((level - 50) * 0.0005); // Slower increase after level 50
-  }
-  similarity = Math.min(0.99, similarity * performanceRating);
-
-  // Selection time calculation
-  let selectionTime;
-  if (level <= 10) {
-    selectionTime = 15;
-  } else if (level <= 80) {
-    selectionTime = Math.max(2, 15 - Math.floor((level - 10) / 5));
-  } else {
-    selectionTime = 2;
-  }
-  selectionTime = Math.max(2, Math.round(selectionTime / performanceRating));
-
-  const viewTime = 3; // Constant view time of 3 seconds
-
-  return { colorCount, similarity, viewTime, selectionTime };
-}
 
 // Create a separate worker for score saving
 const scoreSavingWorker = new Worker(new URL('../workers/scoreSavingWorker.ts', import.meta.url));
@@ -529,7 +494,7 @@ export function ColorMemoryGame() {
               )}
             </div>
             <Progress 
-              value={(gameState.timeLeft / calculateDifficulty(gameState.level, performanceRating)[showTarget ? 'viewTime' : 'selectionTime']) * 100} 
+              value={(gameState.timeLeft / (showTarget ? calculateDifficulty(gameState.level, performanceRating).viewTime : calculateDifficulty(gameState.level, performanceRating).selectionTime)) * 100} 
               className="h-2 sm:h-3 md:h-4 w-full"
             />
           </div>
