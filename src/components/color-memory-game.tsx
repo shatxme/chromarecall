@@ -408,7 +408,7 @@ export function ColorMemoryGame() {
   const renderColorSwatches = useCallback(() => {
     const totalColors = Math.min(6, gameState.options.length);
     return (
-      <div className="grid grid-cols-3 gap-4 sm:gap-6">
+      <div className="grid grid-cols-3 gap-3 sm:gap-4 justify-center max-w-xs sm:max-w-sm md:max-w-md mx-auto">
         {gameState.options.slice(0, totalColors).map((color) => (
           <ColorSwatch
             key={color}
