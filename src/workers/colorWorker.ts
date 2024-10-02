@@ -2,10 +2,10 @@ import { generateColors, calculateDifficulty } from '../lib/color-utils';
 
 console.log('Color worker initialized');
 
-self.onmessage = (e: MessageEvent) => {
-  console.log('Color worker received message:', e.data);
+self.onmessage = async (event) => {
+  const { level, performanceRating } = event.data;
+
   try {
-    const { level, performanceRating } = e.data;
     const { colorCount, similarity } = calculateDifficulty(level, performanceRating);
     const { target, options } = generateColors(colorCount, similarity);
     self.postMessage({ target, options });

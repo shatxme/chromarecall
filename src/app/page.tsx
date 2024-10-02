@@ -23,7 +23,7 @@ export default function Home() {
   }
   
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-400 via-pink-500 to-red-500">
+    <div className="min-h-screen bg-gradient-to-r from-gray-800 to-gray-900">
       <div className="container mx-auto px-4 py-8 sm:py-12">
         <AnimatedHeader />
         <div className="max-w-4xl mx-auto bg-gray-100 rounded-lg shadow-xl overflow-hidden mt-8 sm:mt-12 md:mt-16">

@@ -14,7 +14,6 @@ let lastCacheTime = 0;
 const CACHE_DURATION = 60000; // 1 minute
 
 export async function GET() {
-  // Remove the 'request' parameter as it's not being used
   let client: MongoClient | null = null;
   try {
     client = await clientPromise;
