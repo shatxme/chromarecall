@@ -405,9 +405,17 @@ export function ColorMemoryGame() {
       } else {
         updateGameState({ highScore: event.data.highestScore })
         updateUserData(event.data.highestScore)
+        setScoreSaved(true)
       }
     }
   }, [memoizedToast, updateUserData, updateGameState])
+
+  const handlePlayAgain = useCallback(() => {
+    setShowLossDialog(false)
+    setIsProcessingSelection(false)
+    setScoreSaved(false)
+    startGame()
+  }, [startGame])
 
   const handleUsernameSubmit = useCallback(async () => {
     if (tempUsername.trim()) {
@@ -424,9 +432,9 @@ export function ColorMemoryGame() {
       setTempUsername('')
       
       saveScoreInBackground(tempUsername, gameState.score, gameState.level)
-      startGame()
+      handlePlayAgain()
     }
-  }, [tempUsername, gameState.score, gameState.level, saveUserData, saveScoreInBackground, startGame])
+  }, [tempUsername, gameState.score, gameState.level, saveUserData, saveScoreInBackground, handlePlayAgain])
 
   const handleEndGame = useCallback((lost = false) => {
     endGame(lost);
@@ -444,7 +452,6 @@ export function ColorMemoryGame() {
       setShowUsernameInput(true)
     } else if (!scoreSaved) {
       saveScoreInBackground(localUserData.username, gameState.score, gameState.level)
-      setScoreSaved(true)
     }
 
     if (lost) {
@@ -517,13 +524,6 @@ export function ColorMemoryGame() {
       </div>
     )
   }, [gameState.options, gameState.isPlaying, handleColorSelection, isProcessingSelection])
-
-  const handlePlayAgain = useCallback(() => {
-    setShowLossDialog(false)
-    setIsProcessingSelection(false)
-    setScoreSaved(false)
-    startGame()
-  }, [startGame])
 
   return (
     <div className="p-2 sm:p-4 pb-4 sm:pb-6 relative">
