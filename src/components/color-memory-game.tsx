@@ -71,13 +71,12 @@ function useGameLogic(
   const updateGameState = useCallback((updates: Partial<GameState> | ((prevState: GameState) => Partial<GameState>)) => {
     setGameState(prev => {
       const newState = typeof updates === 'function' ? updates(prev) : updates;
-      console.log('Updating game state:', newState);
       return { ...prev, ...newState };
     });
   }, []);
 
   const endGame = useCallback((lost = false) => {
-    console.log('Ending game', { lost });
+    // 'lost' parameter is kept for future use or consistency with other functions
     updateGameState({ 
       isPlaying: false,
       timeLeft: 3,
@@ -91,7 +90,6 @@ function useGameLogic(
     if (colorGenerationTimeoutRef.current) {
       clearTimeout(colorGenerationTimeoutRef.current)
     }
-    // Note: We'll handle the rest of the endGame logic in the ColorMemoryGame component
   }, [updateGameState, setIsProcessingSelection]);
 
   const generateColorsWithWorker = useCallback((level: number): Promise<{ target: string, options: string[] }> => {
@@ -104,7 +102,6 @@ function useGameLogic(
 
         workerRef.current.onmessage = (e: MessageEvent) => {
           clearTimeout(timeoutId);
-          console.log(`Colors generated for level ${level}:`, e.data);
           if (e.data.error) {
             reject(new Error(e.data.error));
           } else {
@@ -114,11 +111,9 @@ function useGameLogic(
 
         workerRef.current.onerror = (error) => {
           clearTimeout(timeoutId);
-          console.error('Error in color worker:', error);
           reject(error);
         };
 
-        console.log(`Requesting colors for level ${level}`);
         workerRef.current.postMessage({ level });
       } else {
         reject(new Error('Worker not initialized'));
@@ -127,12 +122,9 @@ function useGameLogic(
   }, []);
 
   const startGame = useCallback(async () => {
-    console.log('Starting game...')
     setIsProcessingSelection(false)
     try {
-      console.log('Generating initial colors...')
       const colors = await generateColorsWithWorker(1)
-      console.log('Initial colors generated:', colors)
       
       if (!colors || !colors.target || !colors.options) {
         throw new Error('Invalid colors generated');
@@ -152,15 +144,11 @@ function useGameLogic(
       setCloseMatches(0)
       setLevelStarted(0)
       setTimerPhase('target')
-      
-      console.log('Game state initialized')
     } catch (error) {
-      console.error('Error starting game:', error)
       memoizedToast({
         title: "Error",
         description: "Failed to start the game. Please try again.",
       })
-      // Reset game state on error
       updateGameState({
         isPlaying: false,
         score: 0,
@@ -169,21 +157,16 @@ function useGameLogic(
         targetColor: '',
         options: []
       })
-    } finally {
-      console.log('Start game process completed')
     }
   }, [generateColorsWithWorker, updateGameState, setIsProcessingSelection, memoizedToast])
 
   const handleColorSelect = useCallback(async (selectedColor: string) => {
-    console.log('Color selected:', selectedColor, 'Current level:', gameState.level)
     if (!gameState.isPlaying) {
-      console.log('Selection ignored: game not playing')
       return null
     }
 
     try {
       const difference = calculateColorDifference(gameState.targetColor, selectedColor)
-      console.log('Color difference:', difference)
 
       const { selectionTime } = calculateDifficulty(gameState.level)
       const timeBonus = Math.max(0, gameState.timeLeft / selectionTime)
@@ -211,10 +194,8 @@ function useGameLogic(
       }
 
       if (!isExactMatch && newCloseMatches > closeMatchLimit) {
-        feedbackMessage = "Game Over! Too many close matches."
         gameOver = true
       } else if (difference >= similarityThreshold) {
-        feedbackMessage = "Game Over! Color mismatch."
         gameOver = true
       } else {
         feedbackMessage = isExactMatch ? `Perfect! ${newComboMultiplier.toFixed(1)}x Combo!` : "Close enough!"
@@ -224,13 +205,9 @@ function useGameLogic(
       const speedPoints = Math.round(timeBonus * 50)
       const totalPoints = Math.round((accuracyPoints + speedPoints) * newComboMultiplier)
 
-      console.log('Updating game state. Game over:', gameOver)
-
       if (gameOver) {
-        console.log('Game over')
         updateGameState({ isPlaying: false })
       } else {
-        console.log('Generating new colors for next level')
         let retries = 3;
         let newColors: { target: string, options: string[] } | null = null;
         while (retries > 0) {
@@ -238,7 +215,6 @@ function useGameLogic(
             newColors = await generateColorsWithWorker(gameState.level + 1);
             break;
           } catch (error) {
-            console.error(`Error generating colors, retries left: ${retries - 1}`, error);
             retries--;
             if (retries === 0) throw error;
           }
@@ -247,8 +223,6 @@ function useGameLogic(
         if (!newColors) {
           throw new Error('Failed to generate new colors');
         }
-        
-        console.log('New colors generated:', newColors)
         
         updateGameState((prevState) => ({
           level: prevState.level + 1,
@@ -261,14 +235,12 @@ function useGameLogic(
         setTimerPhase('target')
         setShowTarget(true)
 
-        // Implement fail-safe mechanism
         if (colorGenerationTimeoutRef.current) {
           clearTimeout(colorGenerationTimeoutRef.current);
         }
         colorGenerationTimeoutRef.current = setTimeout(() => {
-          console.error('Color selection not made within expected timeframe');
           endGame(true);
-        }, 10000); // 10 second fail-safe
+        }, 10000);
       }
 
       setLevelStarted(currentTenLevelBlock)
@@ -277,7 +249,6 @@ function useGameLogic(
 
       return { gameOver, feedbackMessage, isExactMatch, totalPoints, accuracyPoints, speedPoints }
     } catch (error) {
-      console.error("Error in handleColorSelect:", error)
       memoizedToast({
         title: "Error",
         description: "An unexpected error occurred. The game will end.",
@@ -289,7 +260,6 @@ function useGameLogic(
 
   useEffect(() => {
     const runTimer = () => {
-      console.log('Timer tick', { isPlaying: gameState.isPlaying, timeLeft: gameState.timeLeft, timerPhase });
       if (gameState.isPlaying) {
         if (gameState.timeLeft > 1) {
           updateGameState((prevState) => ({ 
@@ -306,7 +276,6 @@ function useGameLogic(
               timeLeft: selectionTime 
             }))
           } else {
-            console.log('Time up, ending game');
             updateGameState({ isPlaying: false })
             endGame(true);
           }
@@ -462,19 +431,14 @@ export function ColorMemoryGame() {
 
   // Update handleColorSelection to use handleEndGame
   const handleColorSelection = useCallback((selectedColor: string) => {
-    console.log('handleColorSelection called', { selectedColor, isProcessingSelection, isPlaying: gameState.isPlaying });
-
     if (isProcessingSelection || !gameState.isPlaying) {
-      console.log('Selection ignored: already processing or game not playing');
       return;
     }
 
-    console.log('Setting isProcessingSelection to true');
     setIsProcessingSelection(true);
 
     handleColorSelect(selectedColor)
       .then((result) => {
-        console.log('handleColorSelect result:', result);
         if (result) {
           const { gameOver, feedbackMessage, isExactMatch, totalPoints, accuracyPoints, speedPoints } = result;
           setExactMatch(isExactMatch);
@@ -489,22 +453,18 @@ export function ColorMemoryGame() {
           });
 
           if (gameOver) {
-            console.log('Game over, calling handleEndGame');
             handleEndGame(true);
-          } else {
-            console.log('Game continues, current level:', gameState.level);
           }
         }
       })
       .catch((error) => {
-        console.error("Error in handleColorSelection:", error);
+        console.error("Error during color selection:", error);
         handleEndGame(true);
       })
       .finally(() => {
-        console.log('Setting isProcessingSelection to false');
         setIsProcessingSelection(false);
       });
-  }, [handleColorSelect, comboMultiplier, memoizedToast, handleEndGame, setIsProcessingSelection, isProcessingSelection, gameState.isPlaying, gameState.level]);
+  }, [handleColorSelect, comboMultiplier, memoizedToast, handleEndGame, setIsProcessingSelection, isProcessingSelection, gameState.isPlaying]);
 
   const renderColorSwatches = useCallback(() => {
     const totalColors = Math.min(6, gameState.options.length)

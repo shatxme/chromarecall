@@ -103,7 +103,7 @@ export function generateColors(colorCount: number, similarity: number): { target
     do {
       option = generateSimilarColor(target, similarity);
       attempts++;
-    } while (calculateColorDifference(target, option) < colorDifferenceThreshold && attempts < maxAttempts);
+    } while ((calculateColorDifference(target, option) < colorDifferenceThreshold || !isContrastSufficient(option)) && attempts < maxAttempts);
     
     options.push(option);
   }
@@ -124,8 +124,8 @@ function generateSimilarColor(baseColor: string, similarity: number): string {
   const lightnessRange = 50 * (1 - similarity);
 
   const newHue = (h + (Math.random() * 2 - 1) * hueRange + 360) % 360;
-  const newSaturation = Math.max(0, Math.min(100, s + (Math.random() * 2 - 1) * saturationRange));
-  const newLightness = Math.max(0, Math.min(80, l + (Math.random() * 2 - 1) * lightnessRange)); // Limited lightness to 80
+  const newSaturation = Math.max(20, Math.min(100, s + (Math.random() * 2 - 1) * saturationRange));
+  const newLightness = Math.max(20, Math.min(70, l + (Math.random() * 2 - 1) * lightnessRange)); // Limited lightness range
 
   return hslToHex(newHue, newSaturation, newLightness);
 }
@@ -285,4 +285,11 @@ export function calculateDifficulty(level: number) {
   const viewTime = 3; // Constant view time of 3 seconds
 
   return { colorCount, similarity, viewTime, selectionTime };
+}
+
+function isContrastSufficient(color: string): boolean {
+  const [h, s, l] = hex2hsl(color);
+  // Log the hue and saturation for debugging purposes
+  console.log(`Color HSL - Hue: ${h}, Saturation: ${s}, Lightness: ${l}`);
+  return l <= 70; // Ensure the lightness is not too high
 }
