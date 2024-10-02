@@ -265,7 +265,7 @@ export function calculateTimeForLevel(level: number): number {
 }
 
 // Update the calculateDifficulty function
-export function calculateDifficulty(level: number, performanceRating: number) {
+export function calculateDifficulty(level: number) {
   // Color count calculation
   const baseColorCount = 3;
   const additionalColors = Math.floor(level / 10);
@@ -282,7 +282,7 @@ export function calculateDifficulty(level: number, performanceRating: number) {
   } else {
     similarity = 0.96 + ((level - 50) * 0.0005); // Slower increase after 50
   }
-  similarity = Math.min(0.99, similarity * performanceRating);
+  similarity = Math.min(0.99, similarity);
 
   // Selection time calculation
   let selectionTime;
@@ -293,7 +293,6 @@ export function calculateDifficulty(level: number, performanceRating: number) {
   } else {
     selectionTime = 2;
   }
-  selectionTime = Math.max(2, Math.round(selectionTime / performanceRating));
 
   const viewTime = 3; // Constant view time of 3 seconds
 
