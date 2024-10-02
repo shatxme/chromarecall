@@ -350,7 +350,6 @@ export function ColorMemoryGame() {
   const [feedbackText, setFeedbackText] = useState("")
   const [showFeedback, setShowFeedback] = useState(false)
   const [exactMatch, setExactMatch] = useState(false)
-  const [scoreSaved, setScoreSaved] = useState(false)
   const [isProcessingSelection, setIsProcessingSelection] = useState(false)
 
   const memoizedToast = useCallback(toast, [])
@@ -394,26 +393,27 @@ export function ColorMemoryGame() {
   }, [localUserData])
 
   const saveScoreInBackground = useCallback((username: string, score: number, level: number) => {
-    scoreSavingWorker.postMessage({ username, score, level })
-    scoreSavingWorker.onmessage = (event: MessageEvent) => {
-      if (event.data.error) {
-        console.error('Failed to save score:', event.data.error)
-        memoizedToast({
-          title: "Error",
-          description: "Failed to save your score. Please try again.",
-        })
-      } else {
-        updateGameState({ highScore: event.data.highestScore })
-        updateUserData(event.data.highestScore)
-        setScoreSaved(true)
-      }
+    const currentHighScore = localUserData?.highestScore || 0;
+    if (score > currentHighScore) {
+      scoreSavingWorker.postMessage({ username, score, level });
+      scoreSavingWorker.onmessage = (event: MessageEvent) => {
+        if (event.data.error) {
+          console.error('Failed to save score:', event.data.error);
+          memoizedToast({
+            title: "Error",
+            description: "Failed to save your score. Please try again.",
+          });
+        } else {
+          updateGameState({ highScore: event.data.highestScore });
+          updateUserData(event.data.highestScore);
+        }
+      };
     }
-  }, [memoizedToast, updateUserData, updateGameState])
+  }, [localUserData, memoizedToast, updateUserData, updateGameState]);
 
   const handlePlayAgain = useCallback(() => {
     setShowLossDialog(false)
     setIsProcessingSelection(false)
-    setScoreSaved(false)
     startGame()
   }, [startGame])
 
@@ -438,26 +438,27 @@ export function ColorMemoryGame() {
 
   const handleEndGame = useCallback((lost = false) => {
     endGame(lost);
-    const newHighScore = gameState.score > (localUserData?.highestScore || 0)
-    setIsNewHighScore(newHighScore)
+    const newHighScore = gameState.score > (localUserData?.highestScore || 0);
+    setIsNewHighScore(newHighScore);
     
     if (newHighScore) {
       memoizedToast({
         title: "New High Score!",
         description: `Congratulations! You've set a new high score of ${gameState.score} points!`,
-      })
+      });
     }
 
     if (!localUserData) {
-      setShowUsernameInput(true)
-    } else if (!scoreSaved) {
-      saveScoreInBackground(localUserData.username, gameState.score, gameState.level)
+      setShowUsernameInput(true);
+    } else {
+      // Always save the score for existing users
+      saveScoreInBackground(localUserData.username, gameState.score, gameState.level);
     }
 
     if (lost) {
-      setShowLossDialog(true)
+      setShowLossDialog(true);
     }
-  }, [endGame, gameState.score, gameState.level, localUserData, memoizedToast, saveScoreInBackground, scoreSaved])
+  }, [endGame, gameState.score, gameState.level, localUserData, memoizedToast, saveScoreInBackground]);
 
   // Update handleColorSelection to use handleEndGame
   const handleColorSelection = useCallback((selectedColor: string) => {
