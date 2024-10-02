@@ -1,15 +1,3 @@
-export function getThemePalette(theme: string): string[] {
-  const themes: { [key: string]: string[] } = {
-    Ocean: ['#003366', '#0066cc', '#66ccff', '#99ffff', '#ffffff'],
-    Forest: ['#1B5E20', '#4CAF50', '#8BC34A', '#CDDC39', '#FFEB3B'],
-    Sunset: ['#FF6F00', '#FF9800', '#FFC107', '#FFEB3B', '#FFFFFF'],
-    Desert: ['#8B4513', '#D2691E', '#F4A460', '#FFD700', '#FFFAF0'],
-    'Neon City': ['#FF00FF', '#00FFFF', '#FF1493', '#39FF14', '#FFFFFF'],
-    // Add more themes as needed
-  };
-  return themes[theme] || themes.Ocean;
-}
-
 export function adjustColor(color: string, hue: number, saturation: number, brightness: number): string {
   let [h, s, l] = hex2hsl(color);
   h = (h + hue + 360) % 360;

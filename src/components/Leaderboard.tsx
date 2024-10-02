@@ -59,10 +59,6 @@ export function Leaderboard({ localUserData, isLoading, setIsLoading }: Leaderbo
     return <div>Error: {error}</div>
   }
 
-  const userRank = localUserData 
-    ? leaderboard.findIndex(entry => entry.username === localUserData.username) + 1 
-    : null;
-
   return (
     <div className="overflow-x-hidden">
       <div className="overflow-x-auto max-w-full">
@@ -92,12 +88,6 @@ export function Leaderboard({ localUserData, isLoading, setIsLoading }: Leaderbo
           </TableBody>
         </Table>
       </div>
-      {localUserData && (
-        <div className="mt-4 text-center">
-          <p className="font-semibold">Your All-Time Highest Score: {localUserData.highestScore}</p>
-          {userRank && <p className="font-semibold">Your Current Rank: {userRank}</p>}
-        </div>
-      )}
     </div>
   )
 }
