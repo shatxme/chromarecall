@@ -34,7 +34,8 @@ const scoreSavingWorker = new Worker(new URL('../workers/scoreSavingWorker.ts', 
 
 function useGameLogic(
   setIsProcessingSelection: (value: boolean) => void,
-  memoizedToast: (props: { title: string; description: string }) => void
+  memoizedToast: (props: { title: string; description: string }) => void,
+  setShowLossDialog: (show: boolean) => void  // Add this parameter
 ) {
   const [gameState, setGameState] = useState<GameState>({
     targetColor: '',
@@ -53,7 +54,6 @@ function useGameLogic(
 
   const workerRef = useRef<Worker | null>(null)
   const timerRef = useRef<NodeJS.Timeout | null>(null)
-  const colorGenerationTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
     workerRef.current = new Worker(new URL('../workers/colorWorker.ts', import.meta.url))
@@ -61,9 +61,6 @@ function useGameLogic(
       workerRef.current?.terminate()
       if (timerRef.current) {
         clearInterval(timerRef.current)
-      }
-      if (colorGenerationTimeoutRef.current) {
-        clearTimeout(colorGenerationTimeoutRef.current)
       }
     }
   }, [])
@@ -76,7 +73,6 @@ function useGameLogic(
   }, []);
 
   const endGame = useCallback((lost = false) => {
-    // 'lost' parameter is kept for future use or consistency with other functions
     updateGameState({ 
       isPlaying: false,
       timeLeft: 3,
@@ -87,10 +83,12 @@ function useGameLogic(
     if (timerRef.current) {
       clearInterval(timerRef.current)
     }
-    if (colorGenerationTimeoutRef.current) {
-      clearTimeout(colorGenerationTimeoutRef.current)
+    
+    // Add this block to handle the loss dialog
+    if (lost) {
+      setShowLossDialog(true)
     }
-  }, [updateGameState, setIsProcessingSelection]);
+  }, [updateGameState, setIsProcessingSelection, setShowLossDialog]);
 
   const generateColorsWithWorker = useCallback((level: number): Promise<{ target: string, options: string[] }> => {
     return new Promise((resolve, reject) => {
@@ -193,7 +191,8 @@ function useGameLogic(
         newComboMultiplier = Math.min(5, comboMultiplier + 0.5)
       }
 
-      if (!isExactMatch && newCloseMatches > closeMatchLimit) {
+      // Check if the player has reached or exceeded the close match limit
+      if (!isExactMatch && (newCloseMatches > closeMatchLimit || closeMatches >= closeMatchLimit)) {
         gameOver = true
       } else if (difference >= similarityThreshold) {
         gameOver = true
@@ -234,13 +233,6 @@ function useGameLogic(
         
         setTimerPhase('target')
         setShowTarget(true)
-
-        if (colorGenerationTimeoutRef.current) {
-          clearTimeout(colorGenerationTimeoutRef.current);
-        }
-        colorGenerationTimeoutRef.current = setTimeout(() => {
-          endGame(true);
-        }, 10000);
       }
 
       setLevelStarted(currentTenLevelBlock)
@@ -276,8 +268,7 @@ function useGameLogic(
               timeLeft: selectionTime 
             }))
           } else {
-            updateGameState({ isPlaying: false })
-            endGame(true);
+            endGame(true) // This will now show the loss dialog
           }
         }
       }
@@ -306,7 +297,7 @@ function useGameLogic(
     timerPhase,
     setTimerPhase,
     timerRef,
-    endGame  // Add endGame to the returned object
+    endGame
   }
 }
 
@@ -331,10 +322,11 @@ export function ColorMemoryGame() {
     startGame,
     handleColorSelect,
     updateGameState,
-    endGame  // Keep endGame, remove timerRef
+    endGame
   } = useGameLogic(
     setIsProcessingSelection,
-    memoizedToast
+    memoizedToast,
+    setShowLossDialog  // Pass setShowLossDialog to useGameLogic
   )
 
   useEffect(() => {
@@ -380,6 +372,27 @@ export function ColorMemoryGame() {
     }
   }, [localUserData, memoizedToast, updateUserData, updateGameState]);
 
+  const handleEndGame = useCallback((lost = false) => {
+    endGame(lost);
+    const newHighScore = gameState.score > (localUserData?.highestScore || 0);
+    setIsNewHighScore(newHighScore);
+    
+    if (newHighScore) {
+      memoizedToast({
+        title: "New High Score!",
+        description: `Congratulations! You've set a new high score of ${gameState.score} points!`,
+      });
+    }
+
+    if (!localUserData) {
+      setShowUsernameInput(true);
+    } else {
+      saveScoreInBackground(localUserData.username, gameState.score, gameState.level);
+    }
+
+    setShowLossDialog(true);
+  }, [endGame, gameState.score, gameState.level, localUserData, memoizedToast, saveScoreInBackground]);
+
   const handlePlayAgain = useCallback(() => {
     setShowLossDialog(false)
     setIsProcessingSelection(false)
@@ -405,31 +418,6 @@ export function ColorMemoryGame() {
     }
   }, [tempUsername, gameState.score, gameState.level, saveUserData, saveScoreInBackground, handlePlayAgain])
 
-  const handleEndGame = useCallback((lost = false) => {
-    endGame(lost);
-    const newHighScore = gameState.score > (localUserData?.highestScore || 0);
-    setIsNewHighScore(newHighScore);
-    
-    if (newHighScore) {
-      memoizedToast({
-        title: "New High Score!",
-        description: `Congratulations! You've set a new high score of ${gameState.score} points!`,
-      });
-    }
-
-    if (!localUserData) {
-      setShowUsernameInput(true);
-    } else {
-      // Always save the score for existing users
-      saveScoreInBackground(localUserData.username, gameState.score, gameState.level);
-    }
-
-    if (lost) {
-      setShowLossDialog(true);
-    }
-  }, [endGame, gameState.score, gameState.level, localUserData, memoizedToast, saveScoreInBackground]);
-
-  // Update handleColorSelection to use handleEndGame
   const handleColorSelection = useCallback((selectedColor: string) => {
     if (isProcessingSelection || !gameState.isPlaying) {
       return;
@@ -453,13 +441,13 @@ export function ColorMemoryGame() {
           });
 
           if (gameOver) {
-            handleEndGame(true);
+            handleEndGame(true);  // Use the existing endGame function
           }
         }
       })
       .catch((error) => {
         console.error("Error during color selection:", error);
-        handleEndGame(true);
+        handleEndGame(true);  // Use the existing endGame function
       })
       .finally(() => {
         setIsProcessingSelection(false);

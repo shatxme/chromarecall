@@ -78,54 +78,72 @@ function hslToHex(h: number, s: number, l: number): string {
 }
 
 function generateRandomColor(): string {
-  return `#${Math.floor(Math.random()*16777215).toString(16).padStart(6, '0')}`;
+  const h = Math.floor(Math.random() * 360);
+  const s = Math.floor(Math.random() * 70) + 30; // 30-100%
+  const l = Math.floor(Math.random() * 40) + 30; // 30-70%
+  return hslToHex(h, s, l);
 }
 
 export function generateColors(colorCount: number, similarity: number): { target: string, options: string[] } {
-  const target = generateRandomColor();
-  const options = [target];
+  let target;
+  do {
+    target = generateRandomColor();
+  } while (!isContrastSufficient(target));
+
+  const options = new Set([target]);
   
-  const colorDifferenceThreshold = (1 - similarity) * 0.1;
-  const decoyThreshold = colorDifferenceThreshold * 0.5;
+  const colorDifferenceThreshold = (1 - similarity) * 0.2; // Increase threshold
+  const decoyThreshold = colorDifferenceThreshold * 0.7; // Increase decoy threshold
   const maxAttempts = 1000;
   
   // Generate a decoy color
   let decoy;
   do {
-    decoy = generateSimilarColor(target, similarity + 0.05);
-  } while (calculateColorDifference(target, decoy) < decoyThreshold);
-  options.push(decoy);
+    decoy = generateSimilarColor(target, similarity * 0.9); // Make decoy slightly more different
+  } while (calculateColorDifference(target, decoy) < decoyThreshold || !isContrastSufficient(decoy) || options.has(decoy));
+  options.add(decoy);
   
   // Generate other colors
-  for (let i = 2; i < colorCount; i++) {
+  while (options.size < colorCount) {
     let option;
     let attempts = 0;
     do {
       option = generateSimilarColor(target, similarity);
       attempts++;
-    } while ((calculateColorDifference(target, option) < colorDifferenceThreshold || !isContrastSufficient(option)) && attempts < maxAttempts);
+    } while ((calculateColorDifference(target, option) < colorDifferenceThreshold || !isContrastSufficient(option) || options.has(option)) && attempts < maxAttempts);
     
-    options.push(option);
+    if (attempts < maxAttempts) {
+      options.add(option);
+    }
   }
   
   // Ensure at least one noticeably different color
   if (colorCount > 3) {
-    const distinctColor = generateDistinctColor(target, similarity);
-    options[options.length - 1] = distinctColor;
+    let distinctColor;
+    do {
+      distinctColor = generateDistinctColor(target, similarity * 0.8); // Make distinct color more different
+    } while (!isContrastSufficient(distinctColor) || options.has(distinctColor));
+    
+    // Remove one of the existing colors, ensuring we don't remove the target
+    const colorToRemove = Array.from(options).find(color => color !== target);
+    if (colorToRemove) {
+      options.delete(colorToRemove);
+    }
+    options.add(distinctColor);
   }
   
-  return { target, options: shuffleArray(options) };
+  return { target, options: shuffleArray(Array.from(options)) };
 }
 
 function generateSimilarColor(baseColor: string, similarity: number): string {
   const [h, s, l] = hex2hsl(baseColor);
-  const hueRange = 360 * (1 - similarity);
-  const saturationRange = 100 * (1 - similarity);
-  const lightnessRange = 50 * (1 - similarity);
+  const hueRange = 360 * (1 - similarity) * 0.7; // Increase hue range
+  const saturationRange = 30 * (1 - similarity); // Increase saturation range
+  const lightnessRange = 20 * (1 - similarity); // Increase lightness range
 
   const newHue = (h + (Math.random() * 2 - 1) * hueRange + 360) % 360;
   const newSaturation = Math.max(20, Math.min(100, s + (Math.random() * 2 - 1) * saturationRange));
-  const newLightness = Math.max(20, Math.min(70, l + (Math.random() * 2 - 1) * lightnessRange)); // Limited lightness range
+  const newLightness = Math.max(20, Math.min(80, l + (Math.random() * 2 - 1) * lightnessRange));
 
   return hslToHex(newHue, newSaturation, newLightness);
 }
@@ -134,13 +152,13 @@ function generateDistinctColor(baseColor: string, similarity: number): string {
   const [h, s, l] = hex2hsl(baseColor);
   const hueShift = 180 + (Math.random() - 0.5) * 60; // Opposite hue with some variation
   const newHue = (h + hueShift) % 360;
-  const newSaturation = Math.max(20, Math.min(80, s + (Math.random() - 0.5) * 40)); // Limited saturation between 20 and 80
-  const newLightness = Math.max(20, Math.min(80, l + (Math.random() - 0.5) * 40)); // Limited lightness to 80
+  const newSaturation = Math.max(30, Math.min(100, s + (Math.random() - 0.5) * 40));
+  const newLightness = Math.max(20, Math.min(80, l + (Math.random() - 0.5) * 40));
   
   // Use similarity to adjust the distinctness
-  const adjustedHue = (newHue + (1 - similarity) * 180) % 360;
-  const adjustedSaturation = Math.max(0, Math.min(100, newSaturation + (1 - similarity) * 50));
-  const adjustedLightness = Math.max(0, Math.min(80, newLightness + (1 - similarity) * 50)); // Ensured lightness does not exceed 80
+  const adjustedHue = (newHue + (1 - similarity) * 90) % 360; // Reduce hue adjustment
+  const adjustedSaturation = Math.max(30, Math.min(100, newSaturation + (1 - similarity) * 30));
+  const adjustedLightness = Math.max(20, Math.min(80, newLightness + (1 - similarity) * 30));
   
   return hslToHex(adjustedHue, adjustedSaturation, adjustedLightness);
 }
@@ -256,30 +274,32 @@ export function calculateTimeForLevel(level: number): number {
 export function calculateDifficulty(level: number) {
   // Color count calculation
   const baseColorCount = 3;
-  const additionalColors = Math.floor(level / 10);
-  const colorCount = Math.min(10, baseColorCount + additionalColors);
+  const additionalColors = Math.floor((level - 1) / 10); // Add a color every 10 levels
+  const colorCount = Math.min(6, baseColorCount + additionalColors); // Cap at 6 colors
 
   // Similarity calculation
   let similarity;
   if (level <= 10) {
-    similarity = 0.7 + (level * 0.01); // Easier start
+    similarity = 0.6 + (level * 0.02); // Start with lower similarity, increase faster
+  } else if (level <= 20) {
+    similarity = 0.8 + ((level - 10) * 0.01); // Gradual increase
   } else if (level <= 30) {
-    similarity = 0.8 + ((level - 10) * 0.005); // Gradual increase
+    similarity = 0.9 + ((level - 20) * 0.005); // Slower increase
   } else if (level <= 50) {
-    similarity = 0.9 + ((level - 30) * 0.003); // Steeper increase
+    similarity = 0.95 + ((level - 30) * 0.001); // Even slower increase
   } else {
-    similarity = 0.96 + ((level - 50) * 0.0005); // Slower increase after 50
+    similarity = 0.97 + ((level - 50) * 0.0002); // Very slow increase after 50
   }
-  similarity = Math.min(0.99, similarity);
+  similarity = Math.min(0.995, similarity); // Cap at 0.995
 
   // Selection time calculation
   let selectionTime;
   if (level <= 10) {
-    selectionTime = 15;
-  } else if (level <= 80) {
-    selectionTime = Math.max(2, 15 - Math.floor((level - 10) / 5));
+    selectionTime = 10;
+  } else if (level <= 50) {
+    selectionTime = Math.max(3, 10 - Math.floor((level - 10) / 5));
   } else {
-    selectionTime = 2;
+    selectionTime = 3;
   }
 
   const viewTime = 3; // Constant view time of 3 seconds
@@ -288,8 +308,7 @@ export function calculateDifficulty(level: number) {
 }
 
 function isContrastSufficient(color: string): boolean {
-  const [h, s, l] = hex2hsl(color);
-  // Log the hue and saturation for debugging purposes
-  console.log(`Color HSL - Hue: ${h}, Saturation: ${s}, Lightness: ${l}`);
-  return l <= 70; // Ensure the lightness is not too high
+  const [, , l] = hex2hsl(color);
+  // Ensure the lightness is not too high or too low
+  return l >= 25 && l <= 75;
 }
