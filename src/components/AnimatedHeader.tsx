@@ -11,7 +11,7 @@ const Leaderboard = dynamic(() => import('./Leaderboard').then(mod => mod.Leader
 
 export default function AnimatedHeader() {
   const [showLeaderboard, setShowLeaderboard] = useState(false)
-  const [isLeaderboardLoading, setIsLeaderboardLoading] = useState(false)
+  const [isLeaderboardLoading, setIsLeaderboardLoading] = useState(true)
 
   const openLeaderboard = useCallback(() => {
     if (!showLeaderboard) {

@@ -16,9 +16,14 @@ import dynamic from 'next/dynamic'
 import { motion, AnimatePresence } from "framer-motion"
 import type { GameState, LocalUserData } from "../types"
 import { calculateColorDifference, calculateDifficulty } from "../lib/color-utils"
+import { Skeleton } from "@/components/ui/skeleton"
 
-const ColorSwatch = dynamic(() => import('./color-swatch'))
-const ScoreDisplay = dynamic(() => import('./score-display'))
+const ColorSwatch = dynamic(() => import('./color-swatch'), {
+  loading: () => <Skeleton className="w-24 h-24 sm:w-32 sm:h-32 md:w-40 md:h-40 rounded-md" />
+})
+const ScoreDisplay = dynamic(() => import('./score-display'), {
+  loading: () => <Skeleton className="w-full h-12" />
+})
 
 const MemoizedColorSwatch = React.memo(ColorSwatch)
 const MemoizedScoreDisplay = React.memo(ScoreDisplay)
@@ -454,26 +459,6 @@ export function ColorMemoryGame() {
       });
   }, [handleColorSelect, comboMultiplier, memoizedToast, handleEndGame, setIsProcessingSelection, isProcessingSelection, gameState.isPlaying]);
 
-  const renderColorSwatches = useCallback(() => {
-    const totalColors = Math.min(6, gameState.options.length)
-    return (
-      <div className="grid grid-cols-3 gap-3 sm:gap-4 md:gap-6 lg:gap-8 justify-center max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg xl:max-w-xl mx-auto">
-        {gameState.options.slice(0, totalColors).map((color) => (
-          <MemoizedColorSwatch
-            key={color}
-            color={color}
-            size="medium"
-            onClick={() => {
-              if (!isProcessingSelection && gameState.isPlaying) {
-                handleColorSelection(color)
-              }
-            }}
-          />
-        ))}
-      </div>
-    )
-  }, [gameState.options, gameState.isPlaying, handleColorSelection, isProcessingSelection])
-
   return (
     <div className="p-2 sm:p-4 pb-4 sm:pb-6 relative">
       <div className="absolute top-2 sm:top-4 left-2 sm:left-4 right-2 sm:right-4 flex justify-center items-center">
@@ -524,16 +509,34 @@ export function ColorMemoryGame() {
         
         {gameState.isPlaying && (
           <div className="space-y-2 sm:space-y-4">
-            <MemoizedScoreDisplay gameState={gameState} comboMultiplier={comboMultiplier} closeMatches={closeMatches} closeMatchLimit={gameState.level <= 50 ? 3 : 1} />
+            <React.Suspense fallback={<Skeleton className="w-full h-12" />}>
+              <MemoizedScoreDisplay gameState={gameState} comboMultiplier={comboMultiplier} closeMatches={closeMatches} closeMatchLimit={gameState.level <= 50 ? 3 : 1} />
+            </React.Suspense>
             <div className="flex justify-center my-8 sm:my-0">
               {showTarget ? (
-                <MemoizedColorSwatch 
-                  key={`target-${gameState.targetColor}`}
-                  color={gameState.targetColor} 
-                  size="large"
-                />
+                <React.Suspense fallback={<Skeleton className="w-24 h-24 sm:w-32 sm:h-32 md:w-40 md:h-40 rounded-md" />}>
+                  <MemoizedColorSwatch 
+                    key={`target-${gameState.targetColor}`}
+                    color={gameState.targetColor} 
+                    size="large"
+                  />
+                </React.Suspense>
               ) : (
-                renderColorSwatches()
+                <div className="grid grid-cols-3 gap-3 sm:gap-4 md:gap-6 lg:gap-8 justify-center max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg xl:max-w-xl mx-auto">
+                  {gameState.options.slice(0, Math.min(6, gameState.options.length)).map((color) => (
+                    <React.Suspense key={color} fallback={<Skeleton className="w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 rounded-md" />}>
+                      <MemoizedColorSwatch
+                        color={color}
+                        size="medium"
+                        onClick={() => {
+                          if (!isProcessingSelection && gameState.isPlaying) {
+                            handleColorSelection(color)
+                          }
+                        }}
+                      />
+                    </React.Suspense>
+                  ))}
+                </div>
               )}
             </div>
             <Progress 

@@ -1,9 +1,11 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState } from 'react'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "./ui/table"
 import { Trophy } from 'lucide-react'
 import type { LocalUserData } from "../types"
+import useSWR from 'swr'
+import { Skeleton } from "@/components/ui/skeleton"
 
 type LeaderboardEntry = {
   username: string
@@ -13,50 +15,48 @@ type LeaderboardEntry = {
 
 interface LeaderboardProps {
   localUserData: LocalUserData | null;
-  isLoading: boolean;
+  isLoading: boolean;  // Add this back
   setIsLoading: (isLoading: boolean) => void;
 }
 
-export function Leaderboard({ localUserData, isLoading, setIsLoading }: LeaderboardProps) {
-  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([])
-  const [error, setError] = useState<string | null>(null)
+const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
-  const fetchLeaderboard = useCallback(async () => {
-    try {
-      const response = await fetch('/api/leaderboard')
-      if (!response.ok) {
-        throw new Error(`Failed to fetch leaderboard: ${response.status} ${response.statusText}`)
-      }
-      const data = await response.json()
-      setLeaderboard(data.leaderboard)
-      
-      if (localUserData) {
-        const userEntry = data.leaderboard.find((entry: LeaderboardEntry) => entry.username === localUserData.username)
-        if (userEntry && userEntry.score > localUserData.highestScore) {
-          const updatedUserData = { ...localUserData, highestScore: userEntry.score }
-          localStorage.setItem('userData', JSON.stringify(updatedUserData))
-        }
-      }
-    } catch (error) {
-      console.error('Error fetching leaderboard:', error)
-      setError(error instanceof Error ? error.message : 'An unknown error occurred')
-    } finally {
-      setIsLoading(false)
-    }
-  }, [localUserData, setIsLoading])
+export function Leaderboard({ localUserData, isLoading, setIsLoading }: LeaderboardProps) {
+  const { data, error } = useSWR<{ leaderboard: LeaderboardEntry[] }>('/api/leaderboard', fetcher, {
+    revalidateOnFocus: false,
+    revalidateOnReconnect: false,
+  });
+
+  const [optimisticLeaderboard, setOptimisticLeaderboard] = useState<LeaderboardEntry[]>([]);
 
   useEffect(() => {
-    if (isLoading) {
-      fetchLeaderboard()
+    if (data) {
+      setOptimisticLeaderboard(data.leaderboard);
+      setIsLoading(false);
     }
-  }, [fetchLeaderboard, isLoading])
+  }, [data, setIsLoading]);
 
-  if (isLoading) {
-    return <div>Loading leaderboard...</div>
-  }
+  useEffect(() => {
+    if (localUserData) {
+      setOptimisticLeaderboard((prevLeaderboard) => {
+        const userIndex = prevLeaderboard.findIndex((entry) => entry.username === localUserData.username);
+        if (userIndex === -1 && localUserData.highestScore > 0) {
+          // Add user to leaderboard if they're not there
+          const newLeaderboard = [...prevLeaderboard, { username: localUserData.username, score: localUserData.highestScore, level: 0 }];
+          return newLeaderboard.sort((a, b) => b.score - a.score).slice(0, 10);
+        } else if (userIndex !== -1 && localUserData.highestScore > prevLeaderboard[userIndex].score) {
+          // Update user's score if it's higher
+          const newLeaderboard = [...prevLeaderboard];
+          newLeaderboard[userIndex] = { ...newLeaderboard[userIndex], score: localUserData.highestScore };
+          return newLeaderboard.sort((a, b) => b.score - a.score);
+        }
+        return prevLeaderboard;
+      });
+    }
+  }, [localUserData]);
 
   if (error) {
-    return <div>Error: {error}</div>
+    return <div>Error loading leaderboard</div>;
   }
 
   return (
@@ -72,19 +72,31 @@ export function Leaderboard({ localUserData, isLoading, setIsLoading }: Leaderbo
             </TableRow>
           </TableHeader>
           <TableBody>
-            {leaderboard.map((entry, index) => (
-              <TableRow key={entry.username} className={getRankStyle(index)}>
-                <TableCell className="font-medium">
-                  <div className="flex items-center space-x-2">
-                    {getRankIcon(index)}
-                    <span>{index + 1}</span>
-                  </div>
-                </TableCell>
-                <TableCell>{entry.username}</TableCell>
-                <TableCell className="text-right">{entry.score}</TableCell>
-                <TableCell className="text-right">{entry.level}</TableCell>
-              </TableRow>
-            ))}
+            {isLoading || !data ? (
+              // Skeleton loader
+              Array.from({ length: 10 }).map((_, index) => (
+                <TableRow key={`skeleton-${index}`}>
+                  <TableCell><Skeleton className="h-6 w-6" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                  <TableCell className="text-right"><Skeleton className="h-4 w-12 ml-auto" /></TableCell>
+                  <TableCell className="text-right"><Skeleton className="h-4 w-8 ml-auto" /></TableCell>
+                </TableRow>
+              ))
+            ) : (
+              optimisticLeaderboard.map((entry, index) => (
+                <TableRow key={entry.username} className={getRankStyle(index)}>
+                  <TableCell className="font-medium">
+                    <div className="flex items-center space-x-2">
+                      {getRankIcon(index)}
+                      <span>{index + 1}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell>{entry.username}</TableCell>
+                  <TableCell className="text-right">{entry.score}</TableCell>
+                  <TableCell className="text-right">{entry.level}</TableCell>
+                </TableRow>
+              ))
+            )}
           </TableBody>
         </Table>
       </div>

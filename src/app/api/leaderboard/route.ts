@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import clientPromise from '../../../lib/mongodb';
 import { MongoClient, Collection, Document } from 'mongodb';
+import { cache } from 'react';
 
 // Define the LeaderboardEntry type
 interface LeaderboardEntry {
@@ -13,7 +14,7 @@ let leaderboardCache: LeaderboardEntry[] | null = null;
 let lastCacheTime = 0;
 const CACHE_DURATION = 60000; // 1 minute
 
-export async function GET() {
+const getLeaderboard = cache(async () => {
   let client: MongoClient | null = null;
   try {
     client = await clientPromise;
@@ -22,7 +23,7 @@ export async function GET() {
 
     // Check if we have a valid cache
     if (leaderboardCache && Date.now() - lastCacheTime < CACHE_DURATION) {
-      return NextResponse.json({ leaderboard: leaderboardCache });
+      return leaderboardCache;
     }
 
     // If no cache or cache is stale, fetch from database
@@ -32,13 +33,16 @@ export async function GET() {
     leaderboardCache = leaderboard;
     lastCacheTime = Date.now();
 
-    return NextResponse.json({ leaderboard });
+    return leaderboard;
   } catch (error: unknown) {
-    return NextResponse.json({ 
-      message: 'Error processing leaderboard request', 
-      error: error instanceof Error ? error.message : String(error)
-    }, { status: 500 });
+    console.error('Error fetching leaderboard:', error);
+    return [];
   }
+});
+
+export async function GET() {
+  const leaderboard = await getLeaderboard();
+  return NextResponse.json({ leaderboard });
 }
 
 async function fetchLeaderboard(collection: Collection<Document>): Promise<LeaderboardEntry[]> {
