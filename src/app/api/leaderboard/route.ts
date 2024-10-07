@@ -65,6 +65,21 @@ async function fetchLeaderboard(collection: Collection<Document>): Promise<Leade
   return leaderboardData as LeaderboardEntry[];
 }
 
+async function isScoreInTop10(collection: Collection<Document>, score: number): Promise<boolean> {
+  const topScores = await collection
+    .find()
+    .sort({ score: -1 })
+    .limit(10)
+    .toArray();
+
+  if (topScores.length < 10) {
+    return true; // If we have less than 10 scores, any new score is in the top 10
+  }
+
+  const lowestTopScore = topScores[topScores.length - 1].score;
+  return score > lowestTopScore;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const client = await clientPromise;
@@ -73,30 +88,36 @@ export async function POST(request: NextRequest) {
 
     const { username, score, level } = await request.json();
 
-    // Insert new score entry
-    await collection.insertOne({
-      username,
-      score,
-      level,
-      createdAt: new Date()
-    });
+    // Find the existing document for this user
+    const existingScore = await collection.findOne({ username });
 
-    // Invalidate cache on new score
-    leaderboardCache = null;
+    if (!existingScore || score > existingScore.score) {
+      // If no existing score or new score is higher, update or insert
+      await collection.updateOne(
+        { username },
+        { $set: { username, score, level, updatedAt: new Date() } },
+        { upsert: true }
+      );
 
-    // Get the user's highest score
-    const highestScore = await collection.find({ username })
-      .sort({ score: -1 })
-      .limit(1)
-      .toArray();
+      // Invalidate cache on new top score
+      leaderboardCache = null;
 
-    return NextResponse.json({ 
-      message: "Score saved successfully", 
-      highestScore: highestScore[0]?.score || score,
-    }, { status: 201 });
+      return NextResponse.json({ 
+        message: "New high score saved successfully", 
+        highestScore: score,
+        isTop10: true
+      }, { status: 201 });
+    } else {
+      // If the new score is not higher, don't update the database
+      return NextResponse.json({ 
+        message: "Score not saved - not higher than existing score", 
+        highestScore: existingScore.score,
+        isTop10: false
+      }, { status: 200 });
+    }
   } catch (error: unknown) {
     return NextResponse.json({ 
-      message: 'Error saving score', 
+      message: 'Error processing score', 
       error: error instanceof Error ? error.message : String(error)
     }, { status: 500 });
   }

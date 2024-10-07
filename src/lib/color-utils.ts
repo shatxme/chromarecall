@@ -163,98 +163,72 @@ function generateDistinctColor(baseColor: string, similarity: number): string {
   return hslToHex(adjustedHue, adjustedSaturation, adjustedLightness);
 }
 
-export function calculateColorDifference(color1: string, color2: string): number {
-  const rgb1 = hexToRgb(color1);
-  const rgb2 = hexToRgb(color2);
-  
-  // Using CIEDE2000 color difference formula for more accurate perception
-  const lab1 = rgb2lab(rgb1);
-  const lab2 = rgb2lab(rgb2);
-  
-  return deltaE(lab1, lab2) / 100; // Normalize to 0-1 range
-}
-
-// Add these helper functions for CIEDE2000 calculation
-function rgb2lab(rgb: {r: number, g: number, b: number}): [number, number, number] {
-  // Implementation of RGB to LAB conversion
-  let r = rgb.r / 255, g = rgb.g / 255, b = rgb.b / 255;
-
-  r = r > 0.04045 ? Math.pow((r + 0.055) / 1.055, 2.4) : r / 12.92;
-  g = g > 0.04045 ? Math.pow((g + 0.055) / 1.055, 2.4) : g / 12.92;
-  b = b > 0.04045 ? Math.pow((b + 0.055) / 1.055, 2.4) : b / 12.92;
-
-  let x = (r * 0.4124 + g * 0.3576 + b * 0.1805) / 0.95047;
-  let y = (r * 0.2126 + g * 0.7152 + b * 0.0722) / 1.00000;
-  let z = (r * 0.0193 + g * 0.1192 + b * 0.9505) / 1.08883;
-
+function rgbToLab(r: number, g: number, b: number): [number, number, number] {
+  r /= 255; g /= 255; b /= 255;
+  let x = 0.4124564 * r + 0.3575761 * g + 0.1804375 * b;
+  let y = 0.2126729 * r + 0.7151522 * g + 0.0721750 * b;
+  let z = 0.0193339 * r + 0.1191920 * g + 0.9503041 * b;
   x = x > 0.008856 ? Math.pow(x, 1/3) : (7.787 * x) + 16/116;
   y = y > 0.008856 ? Math.pow(y, 1/3) : (7.787 * y) + 16/116;
   z = z > 0.008856 ? Math.pow(z, 1/3) : (7.787 * z) + 16/116;
-
   return [(116 * y) - 16, 500 * (x - y), 200 * (y - z)];
 }
 
-function deltaE(lab1: [number, number, number], lab2: [number, number, number]): number {
-  // Implementation of CIEDE2000 color difference formula
-  const [L1, a1, b1] = lab1;
-  const [L2, a2, b2] = lab2;
-
-  const kL = 1, kC = 1, kH = 1;
-
-  const C1 = Math.sqrt(a1 * a1 + b1 * b1);
-  const C2 = Math.sqrt(a2 * a2 + b2 * b2);
-
-  const aC1C2 = (C1 + C2) / 2.0;
-
-  const G = 0.5 * (1 - Math.sqrt(Math.pow(aC1C2, 7.0) / (Math.pow(aC1C2, 7.0) + Math.pow(25.0, 7.0))));
-
-  const a1p = (1.0 + G) * a1;
-  const a2p = (1.0 + G) * a2;
-
-  const C1p = Math.sqrt(a1p * a1p + b1 * b1);
-  const C2p = Math.sqrt(a2p * a2p + b2 * b2);
-
-  const h1p = Math.atan2(b1, a1p) + 2 * Math.PI * (Math.atan2(b1, a1p) < 0 ? 1 : 0);
-  const h2p = Math.atan2(b2, a2p) + 2 * Math.PI * (Math.atan2(b2, a2p) < 0 ? 1 : 0);
-
-  const dLp = L2 - L1;
-  const dCp = C2p - C1p;
-
-  const dhp = (C1p * C2p) === 0 ? 0 : (h2p - h1p + 360) % 360 - (Math.abs(h2p - h1p) > 180 ? 180 : 0);
-  const dHp = 2 * Math.sqrt(C1p * C2p) * Math.sin(dhp * Math.PI / 360);
-
-  const aL = (L1 + L2) / 2.0;
-  const aCp = (C1p + C2p) / 2.0;
-
-  const aHp = (C1p * C2p) === 0 ? h1p + h2p : (h1p + h2p + 360 * (Math.abs(h1p - h2p) > 180 ? 1 : 0)) / 2;
-
-  const T = 1 - 0.17 * Math.cos(aHp * Math.PI / 180 - Math.PI / 6) + 0.24 * Math.cos(2 * aHp * Math.PI / 180) + 0.32 * Math.cos(3 * aHp * Math.PI / 180 + Math.PI / 30) - 0.20 * Math.cos(4 * aHp * Math.PI / 180 - 7 * Math.PI / 20);
-
-  const dRo = 30 * Math.exp(-((aHp - 275) / 25) * ((aHp - 275) / 25));
-
-  const RC = 2 * Math.sqrt(Math.pow(aCp, 7) / (Math.pow(aCp, 7) + Math.pow(25, 7)));
-  const SL = 1 + ((0.015 * (aL - 50) * (aL - 50)) / Math.sqrt(20 + (aL - 50) * (aL - 50)));
-  const SC = 1 + 0.045 * aCp;
-  const SH = 1 + 0.015 * aCp * T;
-  const RT = -Math.sin(2 * dRo * Math.PI / 180) * RC;
-
-  const dE = Math.sqrt(
-    Math.pow(dLp / (SL * kL), 2) +
-    Math.pow(dCp / (SC * kC), 2) +
-    Math.pow(dHp / (SH * kH), 2) +
-    RT * (dCp / (SC * kC)) * (dHp / (SH * kH))
-  );
-
-  return dE;
+function hexToRgb(hex: string): [number, number, number] {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  return result ? [
+    parseInt(result[1], 16),
+    parseInt(result[2], 16),
+    parseInt(result[3], 16)
+  ] : [0, 0, 0];
 }
 
-function hexToRgb(hex: string): { r: number, g: number, b: number } {
-  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-  return result ? {
-    r: parseInt(result[1], 16),
-    g: parseInt(result[2], 16),
-    b: parseInt(result[3], 16)
-  } : { r: 0, g: 0, b: 0 };
+export function calculateColorDifference(color1: string, color2: string): number {
+  const [r1, g1, b1] = hexToRgb(color1);
+  const [r2, g2, b2] = hexToRgb(color2);
+  
+  // Convert RGB to LAB color space
+  const [l1, a1, b1_] = rgbToLab(r1, g1, b1);
+  const [l2, a2, b2_] = rgbToLab(r2, g2, b2);
+  
+  // Calculate CIEDE2000 color difference
+  const L_ = (l1 + l2) / 2;
+  const C1 = Math.sqrt(a1 * a1 + b1_ * b1_);
+  const C2 = Math.sqrt(a2 * a2 + b2_ * b2_);
+  const C_ = (C1 + C2) / 2;
+  
+  const G = 0.5 * (1 - Math.sqrt(Math.pow(C_, 7) / (Math.pow(C_, 7) + Math.pow(25, 7))));
+  const a1p = a1 * (1 + G);
+  const a2p = a2 * (1 + G);
+  
+  const C1p = Math.sqrt(a1p * a1p + b1_ * b1_);
+  const C2p = Math.sqrt(a2p * a2p + b2_ * b2_);
+  const C_p = (C1p + C2p) / 2;
+  
+  const h1p = Math.atan2(b1_, a1p) * 180 / Math.PI;
+  const h2p = Math.atan2(b2_, a2p) * 180 / Math.PI;
+  
+  const dLp = l2 - l1;
+  const dCp = C2p - C1p;
+  let dhp = h2p - h1p;
+  if (dhp > 180) dhp -= 360;
+  else if (dhp < -180) dhp += 360;
+  const dHp = 2 * Math.sqrt(C1p * C2p) * Math.sin(dhp * Math.PI / 360);
+  
+  const SL = 1 + (0.015 * Math.pow(L_ - 50, 2)) / Math.sqrt(20 + Math.pow(L_ - 50, 2));
+  const SC = 1 + 0.045 * C_p;
+  const T = 1 - 0.17 * Math.cos((h1p - 30) * Math.PI / 180) + 0.24 * Math.cos((2 * h1p) * Math.PI / 180) + 0.32 * Math.cos((3 * h1p + 6) * Math.PI / 180) - 0.20 * Math.cos((4 * h1p - 63) * Math.PI / 180);
+  const SH = 1 + 0.015 * C_p * T;
+  const RT = -2 * Math.sqrt(Math.pow(C_p, 7) / (Math.pow(C_p, 7) + Math.pow(25, 7))) * Math.sin((60 * Math.exp(-Math.pow((h1p - 275) / 25, 2))) * Math.PI / 180);
+  
+  const dE = Math.sqrt(
+    Math.pow(dLp / SL, 2) +
+    Math.pow(dCp / SC, 2) +
+    Math.pow(dHp / SH, 2) +
+    RT * (dCp / SC) * (dHp / SH)
+  );
+  
+  return dE;
 }
 
 function shuffleArray<T>(array: T[]): T[] {
@@ -272,37 +246,12 @@ export function calculateTimeForLevel(level: number): number {
 
 // Update the calculateDifficulty function
 export function calculateDifficulty(level: number) {
-  // Color count calculation
-  const baseColorCount = 3;
-  const additionalColors = Math.floor((level - 1) / 10); // Add a color every 10 levels
-  const colorCount = Math.min(6, baseColorCount + additionalColors); // Cap at 6 colors
-
-  // Similarity calculation
-  let similarity;
-  if (level <= 10) {
-    similarity = 0.6 + (level * 0.02); // Start with lower similarity, increase faster
-  } else if (level <= 20) {
-    similarity = 0.8 + ((level - 10) * 0.01); // Gradual increase
-  } else if (level <= 30) {
-    similarity = 0.9 + ((level - 20) * 0.005); // Slower increase
-  } else if (level <= 50) {
-    similarity = 0.95 + ((level - 30) * 0.001); // Even slower increase
-  } else {
-    similarity = 0.97 + ((level - 50) * 0.0002); // Very slow increase after 50
-  }
-  similarity = Math.min(0.995, similarity); // Cap at 0.995
-
-  // Selection time calculation
-  let selectionTime;
-  if (level <= 10) {
-    selectionTime = 10;
-  } else if (level <= 50) {
-    selectionTime = Math.max(3, 10 - Math.floor((level - 10) / 5));
-  } else {
-    selectionTime = 3;
-  }
-
-  const viewTime = 3; // Constant view time of 3 seconds
+  const colorCount = Math.min(6, 3 + Math.floor(level / 15));
+  const similarity = Math.min(0.95, 0.5 + Math.log10(level + 1) * 0.1);
+  const viewTime = 3;
+  
+  // New selection time calculation
+  const selectionTime = Math.max(5, 15 - Math.floor((level - 1) / 5));
 
   return { colorCount, similarity, viewTime, selectionTime };
 }
@@ -311,4 +260,30 @@ function isContrastSufficient(color: string): boolean {
   const [, , l] = hex2hsl(color);
   // Ensure the lightness is not too high or too low
   return l >= 25 && l <= 75;
+}
+
+// Add these new functions to color-utils.ts
+
+function generateRandomHslColor(): [number, number, number] {
+  const h = Math.random() * 360;
+  const s = Math.random() * 40 + 60; // 60-100%
+  const l = Math.random() * 30 + 35; // 35-65%
+  return [h, s, l];
+}
+
+export function generateGameColors(level: number): { target: string, options: string[] } {
+  const { colorCount } = calculateDifficulty(level);
+  const targetHsl = generateRandomHslColor();
+  const target = hslToHex(...targetHsl);
+  const options: string[] = [target];
+
+  while (options.length < colorCount) {
+    const newColorHsl = generateRandomHslColor();
+    const newColor = hslToHex(...newColorHsl);
+    if (!options.includes(newColor)) {
+      options.push(newColor);
+    }
+  }
+
+  return { target, options: shuffleArray(options) };
 }

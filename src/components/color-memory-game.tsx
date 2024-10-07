@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect, useCallback, useRef } from "react"
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Progress } from "@/components/ui/progress"
@@ -15,8 +15,10 @@ import {
 import dynamic from 'next/dynamic'
 import { motion, AnimatePresence } from "framer-motion"
 import type { GameState, LocalUserData } from "../types"
-import { calculateColorDifference, calculateDifficulty } from "../lib/color-utils"
+import { generateGameColors, calculateColorDifference, calculateDifficulty } from "../lib/color-utils"
 import { Skeleton } from "@/components/ui/skeleton"
+import { saveScore } from '../lib/api';
+import GameIntro from './GameIntro'
 
 const ColorSwatch = dynamic(() => import('./color-swatch'), {
   loading: () => <Skeleton className="w-24 h-24 sm:w-32 sm:h-32 md:w-40 md:h-40 rounded-md" />
@@ -35,12 +37,87 @@ const AttractiveButton: React.FC<React.ButtonHTMLAttributes<HTMLButtonElement>> 
   />
 )
 
-const scoreSavingWorker = new Worker(new URL('../workers/scoreSavingWorker.ts', import.meta.url)) as Worker
+// Utility functions
+const getCloseMatchLimit = (level: number) => level <= 50 ? 3 : 1;
+
+const formatCombo = (combo: number) => combo.toFixed(1);
+
+// Add this type definition if not already present
+type ColorSelectionResult = {
+  gameOver: boolean;
+  feedbackMessage: string;
+  isExactMatch: boolean;
+  totalPoints: number;
+  accuracyPoints: number;
+  speedPoints: number;
+};
+
+// Custom hook for color selection logic
+function useColorSelection(
+  handleColorSelect: (selectedColor: string) => Promise<ColorSelectionResult | null>,
+  comboMultiplier: number,
+  memoizedToast: (props: { title: string; description: string }) => void,
+  handleGameEnd: (lost: boolean) => void,
+  gameState: GameState,
+  isProcessingSelection: boolean,
+  setIsProcessingSelection: (value: boolean) => void
+) {
+  const [feedbackText, setFeedbackText] = useState("");
+  const [showFeedback, setShowFeedback] = useState(false);
+  const [exactMatch, setExactMatch] = useState(false);
+
+  const handleColorSelection = useCallback((selectedColor: string) => {
+    if (isProcessingSelection || !gameState.isPlaying) {
+      return;
+    }
+
+    setIsProcessingSelection(true);
+
+    handleColorSelect(selectedColor)
+      .then((result: ColorSelectionResult | null) => {
+        if (result) {
+          const { gameOver, feedbackMessage, isExactMatch, totalPoints, accuracyPoints, speedPoints } = result;
+          setExactMatch(isExactMatch);
+          setFeedbackText(feedbackMessage);
+          setShowFeedback(true);
+          
+          setTimeout(() => setShowFeedback(false), 1000);
+
+          memoizedToast({
+            title: "Color Selected!",
+            description: `You earned ${totalPoints} points! (Accuracy: ${accuracyPoints}, Speed: ${speedPoints}${comboMultiplier > 1 ? `, Combo: ${formatCombo(comboMultiplier)}x` : ''})`,
+          });
+
+          if (gameOver) {
+            handleGameEnd(true);
+          }
+        }
+      })
+      .catch((error: Error) => {
+        console.error("Error during color selection:", error);
+        handleGameEnd(true);
+      })
+      .finally(() => {
+        setIsProcessingSelection(false);
+      });
+  }, [handleColorSelect, comboMultiplier, memoizedToast, handleGameEnd, gameState.isPlaying, isProcessingSelection, setIsProcessingSelection]);
+
+  return {
+    feedbackText,
+    showFeedback,
+    exactMatch,
+    handleColorSelection
+  };
+}
 
 function useGameLogic(
   setIsProcessingSelection: (value: boolean) => void,
   memoizedToast: (props: { title: string; description: string }) => void,
-  setShowLossDialog: (show: boolean) => void  // Add this parameter
+  setShowLossDialog: (show: boolean) => void,
+  setIsNewHighScore: (value: boolean) => void,
+  setShowUsernameInput: (value: boolean) => void,
+  localUserData: LocalUserData | null,
+  setLocalUserData: React.Dispatch<React.SetStateAction<LocalUserData | null>>
 ) {
   const [gameState, setGameState] = useState<GameState>({
     targetColor: '',
@@ -49,31 +126,22 @@ function useGameLogic(
     level: 1,
     timeLeft: 3,
     isPlaying: false,
-    highScore: 0
+    highScore: 0,
+    closeMatches: 0 // Initialize closeMatches
   })
   const [showTarget, setShowTarget] = useState(false)
-  const [closeMatches, setCloseMatches] = useState(0)
-  const [levelStarted, setLevelStarted] = useState(0)
   const [comboMultiplier, setComboMultiplier] = useState(1)
-  const [timerPhase, setTimerPhase] = useState<'target' | 'selection'>('target')
 
-  const workerRef = useRef<Worker | null>(null)
   const timerRef = useRef<NodeJS.Timeout | null>(null)
-
-  useEffect(() => {
-    workerRef.current = new Worker(new URL('../workers/colorWorker.ts', import.meta.url))
-    return () => {
-      workerRef.current?.terminate()
-      if (timerRef.current) {
-        clearInterval(timerRef.current)
-      }
-    }
-  }, [])
 
   const updateGameState = useCallback((updates: Partial<GameState> | ((prevState: GameState) => Partial<GameState>)) => {
     setGameState(prev => {
       const newState = typeof updates === 'function' ? updates(prev) : updates;
-      return { ...prev, ...newState };
+      const updatedState = { ...prev, ...newState };
+      console.log('Updating game state:', updatedState);
+      return Object.keys(newState).some(key => prev[key as keyof GameState] !== newState[key as keyof GameState])
+        ? updatedState
+        : prev;
     });
   }, []);
 
@@ -89,45 +157,31 @@ function useGameLogic(
       clearInterval(timerRef.current)
     }
     
-    // Add this block to handle the loss dialog
     if (lost) {
       setShowLossDialog(true)
     }
   }, [updateGameState, setIsProcessingSelection, setShowLossDialog]);
 
-  const generateColorsWithWorker = useCallback((level: number): Promise<{ target: string, options: string[] }> => {
-    return new Promise((resolve, reject) => {
-      if (workerRef.current) {
-        const timeoutDuration = Math.min(5000 + (level * 100), 10000);
-        const timeoutId = setTimeout(() => {
-          reject(new Error('Color generation timed out'));
-        }, timeoutDuration);
-
-        workerRef.current.onmessage = (e: MessageEvent) => {
-          clearTimeout(timeoutId);
-          if (e.data.error) {
-            reject(new Error(e.data.error));
-          } else {
-            resolve(e.data as { target: string, options: string[] });
-          }
-        };
-
-        workerRef.current.onerror = (error) => {
-          clearTimeout(timeoutId);
-          reject(error);
-        };
-
-        workerRef.current.postMessage({ level });
-      } else {
-        reject(new Error('Worker not initialized'));
-      }
+  const generateColors = useCallback((level: number): { target: string, options: string[] } => {
+    const result = generateGameColors(level);
+    console.log(`Target color generated for level ${level}: ${result.target}`);
+    
+    const colorDescriptions = result.options.map(color => {
+      if (color === result.target) return `${color} (target color)`;
+      const difference = calculateColorDifference(result.target, color);
+      if (difference < 15) return `${color} (similar color)`;
+      return `${color} (wrong color)`;
     });
+    
+    console.log(`Color options generated for level ${level}: ${colorDescriptions.join(', ')}`);
+    
+    return result;
   }, []);
 
   const startGame = useCallback(async () => {
     setIsProcessingSelection(false)
     try {
-      const colors = await generateColorsWithWorker(1)
+      const colors = generateColors(1)
       
       if (!colors || !colors.target || !colors.options) {
         throw new Error('Invalid colors generated');
@@ -139,14 +193,12 @@ function useGameLogic(
         level: 1,
         timeLeft: 3,
         targetColor: colors.target,
-        options: colors.options
+        options: colors.options,
+        closeMatches: 0 // Ensure closeMatches is reset
       })
       
       setShowTarget(true)
       setComboMultiplier(1)
-      setCloseMatches(0)
-      setLevelStarted(0)
-      setTimerPhase('target')
     } catch (error) {
       memoizedToast({
         title: "Error",
@@ -158,102 +210,128 @@ function useGameLogic(
         level: 1,
         timeLeft: 3,
         targetColor: '',
-        options: []
+        options: [],
+        closeMatches: 0
       })
     }
-  }, [generateColorsWithWorker, updateGameState, setIsProcessingSelection, memoizedToast])
+  }, [generateColors, updateGameState, setIsProcessingSelection, memoizedToast])
+
+  const handleGameEnd = useCallback((lost = false) => {
+    endGame(lost);
+    const newHighScore = gameState.score > (localUserData?.highestScore || 0);
+    setIsNewHighScore(newHighScore);
+    
+    if (localUserData) {
+      if (newHighScore) {
+        try {
+          saveScore(localUserData.username, gameState.score, gameState.level);
+          const updatedUserData = {
+            ...localUserData,
+            highestScore: gameState.score
+          };
+          localStorage.setItem('userData', JSON.stringify(updatedUserData));
+          setLocalUserData(updatedUserData);
+          
+          memoizedToast({
+            title: "New High Score!",
+            description: `Your new high score of ${gameState.score} has been saved!`,
+          });
+        } catch (error) {
+          console.error('Error saving score:', error);
+          memoizedToast({
+            title: "Error",
+            description: "Failed to save your score to the server.",
+          });
+        }
+      } else {
+        memoizedToast({
+          title: "Game Over",
+          description: `Your score: ${gameState.score}. Your high score: ${localUserData.highestScore}`,
+        });
+      }
+    } else {
+      setShowUsernameInput(true);
+    }
+
+    setShowLossDialog(true);
+  }, [endGame, gameState.score, gameState.level, localUserData, setLocalUserData, memoizedToast, setIsNewHighScore, setShowUsernameInput, setShowLossDialog]);
 
   const handleColorSelect = useCallback(async (selectedColor: string) => {
     if (!gameState.isPlaying) {
-      return null
+      return null;
     }
 
-    try {
-      const difference = calculateColorDifference(gameState.targetColor, selectedColor)
+    console.log(`Color chosen for level ${gameState.level}: ${selectedColor}`);
 
-      const { selectionTime } = calculateDifficulty(gameState.level)
-      const timeBonus = Math.max(0, gameState.timeLeft / selectionTime)
-      
-      const similarityThreshold = 0.1 - (Math.min(gameState.level, 50) * 0.001)
-      const isExactMatch = difference < 0.01
-      
-      const closeMatchLimit = gameState.level <= 50 ? 3 : 1
-      const currentTenLevelBlock = Math.floor(gameState.level / 10)
-      
-      let newCloseMatches = closeMatches
-      let newComboMultiplier = comboMultiplier
-      let gameOver = false
-      let feedbackMessage = ""
+    const difference = calculateColorDifference(gameState.targetColor, selectedColor);
+    const { selectionTime, similarity } = calculateDifficulty(gameState.level);
+    const timeBonus = Math.max(0, gameState.timeLeft / selectionTime);
+    
+    const isExactMatch = difference < 1;
+    const isCloseMatch = difference < 25 * (1 - similarity); // Increased threshold from 15 to 25
+    
+    let newCloseMatches = gameState.closeMatches;
+    let newComboMultiplier = comboMultiplier;
+    let gameOver = false;
+    let feedbackMessage = "";
 
-      if (levelStarted !== currentTenLevelBlock) {
-        newCloseMatches = 0
+    const closeMatchLimit = getCloseMatchLimit(gameState.level);
+
+    // Reset close matches every 10 levels
+    if (gameState.level % 10 === 0) {
+      newCloseMatches = 0;
+    }
+
+    if (isExactMatch) {
+      newComboMultiplier = Math.min(5, comboMultiplier + 0.5);
+      feedbackMessage = `Perfect! ${newComboMultiplier.toFixed(1)}x Combo!`;
+    } else if (isCloseMatch) {
+      newCloseMatches++;
+      newComboMultiplier = 1;
+      feedbackMessage = "Close enough!";
+      if (newCloseMatches > closeMatchLimit) {
+        gameOver = true;
+        feedbackMessage = "Out of close matches!";
       }
+    } else {
+      gameOver = true;
+      feedbackMessage = "Wrong color!";
+    }
 
-      if (!isExactMatch) {
-        newCloseMatches++
-        newComboMultiplier = 1
-      } else {
-        newComboMultiplier = Math.min(5, comboMultiplier + 0.5)
-      }
+    const accuracyPoints = Math.max(0, 100 - Math.round(difference * 1000));
+    const speedPoints = Math.round(timeBonus * 50);
+    const totalPoints = Math.round((accuracyPoints + speedPoints) * newComboMultiplier);
 
-      // Check if the player has reached or exceeded the close match limit
-      if (!isExactMatch && (newCloseMatches > closeMatchLimit || closeMatches >= closeMatchLimit)) {
-        gameOver = true
-      } else if (difference >= similarityThreshold) {
-        gameOver = true
-      } else {
-        feedbackMessage = isExactMatch ? `Perfect! ${newComboMultiplier.toFixed(1)}x Combo!` : "Close enough!"
-      }
+    console.log(`Close matches before update: ${gameState.closeMatches}/${closeMatchLimit}`);
+    console.log(`New close matches: ${newCloseMatches}/${closeMatchLimit}`);
 
-      const accuracyPoints = Math.max(0, 100 - Math.round(difference * 1000))
-      const speedPoints = Math.round(timeBonus * 50)
-      const totalPoints = Math.round((accuracyPoints + speedPoints) * newComboMultiplier)
-
-      if (gameOver) {
-        updateGameState({ isPlaying: false })
-      } else {
-        let retries = 3;
-        let newColors: { target: string, options: string[] } | null = null;
-        while (retries > 0) {
-          try {
-            newColors = await generateColorsWithWorker(gameState.level + 1);
-            break;
-          } catch (error) {
-            retries--;
-            if (retries === 0) throw error;
-          }
-        }
-        
-        if (!newColors) {
-          throw new Error('Failed to generate new colors');
-        }
-        
-        updateGameState((prevState) => ({
+    if (gameOver) {
+      updateGameState({ isPlaying: false, closeMatches: newCloseMatches });
+      handleGameEnd(true);
+    } else {
+      const newColors = generateColors(gameState.level + 1);
+      
+      updateGameState((prevState) => {
+        const updatedState = {
+          ...prevState,
           level: prevState.level + 1,
           score: prevState.score + totalPoints,
           targetColor: newColors.target,
           options: newColors.options,
           timeLeft: 3,
-        }))
-        
-        setTimerPhase('target')
-        setShowTarget(true)
-      }
-
-      setLevelStarted(currentTenLevelBlock)
-      setCloseMatches(newCloseMatches)
-      setComboMultiplier(newComboMultiplier)
-
-      return { gameOver, feedbackMessage, isExactMatch, totalPoints, accuracyPoints, speedPoints }
-    } catch (error) {
-      memoizedToast({
-        title: "Error",
-        description: "An unexpected error occurred. The game will end.",
+          closeMatches: newCloseMatches
+        };
+        console.log(`Updated game state:`, updatedState);
+        return updatedState;
       });
-      endGame(true);
-      return null;
+      
+      setShowTarget(true);
     }
-  }, [gameState, levelStarted, closeMatches, comboMultiplier, generateColorsWithWorker, updateGameState, endGame, memoizedToast])
+
+    setComboMultiplier(newComboMultiplier);
+
+    return { gameOver, feedbackMessage, isExactMatch, totalPoints, accuracyPoints, speedPoints };
+  }, [gameState, comboMultiplier, generateColors, updateGameState, handleGameEnd]);
 
   useEffect(() => {
     const runTimer = () => {
@@ -264,8 +342,7 @@ function useGameLogic(
             timeLeft: prevState.timeLeft - 1 
           }))
         } else {
-          if (timerPhase === 'target') {
-            setTimerPhase('selection')
+          if (showTarget) {
             setShowTarget(false)
             const { selectionTime } = calculateDifficulty(gameState.level)
             updateGameState((prevState) => ({ 
@@ -273,7 +350,7 @@ function useGameLogic(
               timeLeft: selectionTime 
             }))
           } else {
-            endGame(true) // This will now show the loss dialog
+            handleGameEnd(true)
           }
         }
       }
@@ -288,21 +365,16 @@ function useGameLogic(
         clearInterval(timerRef.current)
       }
     }
-  }, [gameState.isPlaying, gameState.timeLeft, gameState.level, timerPhase, updateGameState, endGame])
+  }, [gameState.isPlaying, gameState.timeLeft, showTarget, gameState.level, updateGameState, handleGameEnd])
 
   return {
     gameState,
     showTarget,
     setShowTarget,
-    closeMatches,
     comboMultiplier,
     startGame,
     handleColorSelect,
-    updateGameState,
-    timerPhase,
-    setTimerPhase,
-    timerRef,
-    endGame
+    handleGameEnd,
   }
 }
 
@@ -312,27 +384,79 @@ export function ColorMemoryGame() {
   const [tempUsername, setTempUsername] = useState('')
   const [showLossDialog, setShowLossDialog] = useState(false)
   const [isNewHighScore, setIsNewHighScore] = useState(false)
-  const [feedbackText, setFeedbackText] = useState("")
-  const [showFeedback, setShowFeedback] = useState(false)
-  const [exactMatch, setExactMatch] = useState(false)
   const [isProcessingSelection, setIsProcessingSelection] = useState(false)
 
   const memoizedToast = useCallback(toast, [])
 
+  const updateUserData = useCallback((username: string, newScore: number) => {
+    const updatedUserData: LocalUserData = { 
+      username, 
+      highestScore: Math.max(localUserData?.highestScore || 0, newScore) 
+    };
+    localStorage.setItem('userData', JSON.stringify(updatedUserData));
+    setLocalUserData(updatedUserData);
+  }, [localUserData]);
+
   const {
     gameState,
     showTarget,
-    closeMatches,
     comboMultiplier,
     startGame,
     handleColorSelect,
-    updateGameState,
-    endGame
+    handleGameEnd: handleGameEndFromHook,
   } = useGameLogic(
     setIsProcessingSelection,
     memoizedToast,
-    setShowLossDialog  // Pass setShowLossDialog to useGameLogic
+    setShowLossDialog,
+    setIsNewHighScore,
+    setShowUsernameInput,
+    localUserData,
+    setLocalUserData
   )
+
+  const handleGameEnd = useCallback(async (lost = false) => {
+    await handleGameEndFromHook(lost);
+    
+    if (gameState.score > 0) {
+      if (localUserData?.username) {
+        const isNewHighScore = gameState.score > (localUserData.highestScore || 0);
+        updateUserData(localUserData.username, gameState.score);
+        
+        if (isNewHighScore) {
+          try {
+            await saveScore(localUserData.username, gameState.score, gameState.level);
+            memoizedToast({
+              title: "New High Score!",
+              description: `Your new high score of ${gameState.score} has been saved!`,
+            });
+            setIsNewHighScore(true);
+          } catch (error) {
+            console.error('Error saving score:', error);
+            memoizedToast({
+              title: "Error",
+              description: "Failed to save your score to the server.",
+            });
+          }
+        } else {
+          memoizedToast({
+            title: "Game Over",
+            description: `Your score: ${gameState.score}. Your high score: ${localUserData.highestScore}`,
+          });
+        }
+      } else {
+        setShowUsernameInput(true);
+      }
+    }
+
+    setShowLossDialog(true);
+  }, [handleGameEndFromHook, gameState.score, gameState.level, localUserData, updateUserData, memoizedToast, setIsNewHighScore, setShowUsernameInput]);
+
+  const {
+    feedbackText,
+    showFeedback,
+    exactMatch,
+    handleColorSelection
+  } = useColorSelection(handleColorSelect, comboMultiplier, memoizedToast, handleGameEnd, gameState, isProcessingSelection, setIsProcessingSelection);
 
   useEffect(() => {
     const storedData = localStorage.getItem('userData')
@@ -340,63 +464,6 @@ export function ColorMemoryGame() {
       setLocalUserData(JSON.parse(storedData))
     }
   }, [])
-
-  const saveUserData = useCallback((username: string, score: number) => {
-    const userData: LocalUserData = { username, highestScore: score }
-    localStorage.setItem('userData', JSON.stringify(userData))
-    setLocalUserData(userData)
-  }, [])
-
-  const updateUserData = useCallback((newScore: number) => {
-    if (localUserData) {
-      const updatedUserData = { 
-        ...localUserData, 
-        highestScore: Math.max(localUserData.highestScore, newScore) 
-      }
-      localStorage.setItem('userData', JSON.stringify(updatedUserData))
-      setLocalUserData(updatedUserData)
-    }
-  }, [localUserData])
-
-  const saveScoreInBackground = useCallback((username: string, score: number, level: number) => {
-    const currentHighScore = localUserData?.highestScore || 0;
-    if (score > currentHighScore) {
-      scoreSavingWorker.postMessage({ username, score, level });
-      scoreSavingWorker.onmessage = (event: MessageEvent) => {
-        if (event.data.error) {
-          console.error('Failed to save score:', event.data.error);
-          memoizedToast({
-            title: "Error",
-            description: "Failed to save your score. Please try again.",
-          });
-        } else {
-          updateGameState({ highScore: event.data.highestScore });
-          updateUserData(event.data.highestScore);
-        }
-      };
-    }
-  }, [localUserData, memoizedToast, updateUserData, updateGameState]);
-
-  const handleEndGame = useCallback((lost = false) => {
-    endGame(lost);
-    const newHighScore = gameState.score > (localUserData?.highestScore || 0);
-    setIsNewHighScore(newHighScore);
-    
-    if (newHighScore) {
-      memoizedToast({
-        title: "New High Score!",
-        description: `Congratulations! You've set a new high score of ${gameState.score} points!`,
-      });
-    }
-
-    if (!localUserData) {
-      setShowUsernameInput(true);
-    } else {
-      saveScoreInBackground(localUserData.username, gameState.score, gameState.level);
-    }
-
-    setShowLossDialog(true);
-  }, [endGame, gameState.score, gameState.level, localUserData, memoizedToast, saveScoreInBackground]);
 
   const handlePlayAgain = useCallback(() => {
     setShowLossDialog(false)
@@ -406,61 +473,51 @@ export function ColorMemoryGame() {
 
   const handleUsernameSubmit = useCallback(async () => {
     if (tempUsername.trim()) {
-      const response = await fetch(`/api/check-username?username=${encodeURIComponent(tempUsername)}`)
-      const { exists, highestScore } = await response.json()
+      try {
+        const response = await fetch(`/api/check-username?username=${encodeURIComponent(tempUsername)}`);
+        const { exists, highestScore } = await response.json();
 
-      if (exists) {
-        saveUserData(tempUsername, Math.max(highestScore, gameState.score))
-      } else {
-        saveUserData(tempUsername, gameState.score)
-      }
-
-      setShowUsernameInput(false)
-      setTempUsername('')
-      
-      saveScoreInBackground(tempUsername, gameState.score, gameState.level)
-      handlePlayAgain()
-    }
-  }, [tempUsername, gameState.score, gameState.level, saveUserData, saveScoreInBackground, handlePlayAgain])
-
-  const handleColorSelection = useCallback((selectedColor: string) => {
-    if (isProcessingSelection || !gameState.isPlaying) {
-      return;
-    }
-
-    setIsProcessingSelection(true);
-
-    handleColorSelect(selectedColor)
-      .then((result) => {
-        if (result) {
-          const { gameOver, feedbackMessage, isExactMatch, totalPoints, accuracyPoints, speedPoints } = result;
-          setExactMatch(isExactMatch);
-          setFeedbackText(feedbackMessage);
-          setShowFeedback(true);
-          
-          setTimeout(() => setShowFeedback(false), 1000);
-
-          memoizedToast({
-            title: "Color Selected!",
-            description: `You earned ${totalPoints} points! (Accuracy: ${accuracyPoints}, Speed: ${speedPoints}${comboMultiplier > 1 ? `, Combo: ${comboMultiplier.toFixed(1)}x` : ''})`,
-          });
-
-          if (gameOver) {
-            handleEndGame(true);  // Use the existing endGame function
-          }
+        let updatedHighScore = gameState.score;
+        if (exists) {
+          updatedHighScore = Math.max(highestScore, gameState.score);
         }
-      })
-      .catch((error) => {
-        console.error("Error during color selection:", error);
-        handleEndGame(true);  // Use the existing endGame function
-      })
-      .finally(() => {
-        setIsProcessingSelection(false);
-      });
-  }, [handleColorSelect, comboMultiplier, memoizedToast, handleEndGame, setIsProcessingSelection, isProcessingSelection, gameState.isPlaying]);
+
+        updateUserData(tempUsername, updatedHighScore);
+
+        if (updatedHighScore === gameState.score) {
+          await saveScore(tempUsername, gameState.score, gameState.level);
+        }
+
+        setShowUsernameInput(false);
+        setTempUsername('');
+        
+        memoizedToast({
+          title: "Username Saved",
+          description: `Welcome, ${tempUsername}! Your score has been saved.`,
+        });
+
+        handlePlayAgain();
+      } catch (error) {
+        console.error('Error checking username:', error);
+        memoizedToast({
+          title: "Error",
+          description: "Failed to submit username. Please try again.",
+        });
+      }
+    }
+  }, [tempUsername, gameState.score, gameState.level, memoizedToast, handlePlayAgain, updateUserData]);
+
+  const memoizedScoreDisplay = useMemo(() => (
+    <MemoizedScoreDisplay 
+      gameState={gameState} 
+      comboMultiplier={comboMultiplier} 
+      closeMatches={gameState.closeMatches} 
+      closeMatchLimit={getCloseMatchLimit(gameState.level)} 
+    />
+  ), [gameState, comboMultiplier]);
 
   return (
-    <div className="p-2 sm:p-4 pb-4 sm:pb-6 relative">
+    <div className="p-2 sm:p-4 pb-4 sm:pb-6 relative" role="main" aria-label="Color Memory Game">
       <div className="absolute top-2 sm:top-4 left-2 sm:left-4 right-2 sm:right-4 flex justify-center items-center">
         <AnimatePresence mode="wait">
           {showFeedback && (
@@ -471,6 +528,7 @@ export function ColorMemoryGame() {
               exit={{ opacity: 0, y: 20 }}
               transition={{ duration: 0.3 }}
               className={`text-lg sm:text-xl md:text-2xl font-bold text-center ${exactMatch ? 'text-green-500' : 'text-yellow-500'}`}
+              aria-live="polite"
             >
               {feedbackText}
             </motion.div>
@@ -480,37 +538,13 @@ export function ColorMemoryGame() {
       
       <div className="mt-8 sm:mt-12">
         {!gameState.isPlaying && (
-          <div className="text-center max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4 text-gray-800">
-              Ready to test your color perception skills?
-            </h2>
-            <div className="bg-white bg-opacity-80 p-4 sm:p-6 rounded-lg shadow-md mb-6">
-              <p className="text-sm sm:text-base md:text-lg text-gray-700 leading-relaxed text-center mb-2">
-                Here&apos;s how to play:
-              </p>
-              <ul className="text-sm sm:text-base md:text-lg text-gray-700 list-disc list-inside mt-2 space-y-2 text-left">
-                <li>A color will appear briefly</li>
-                <li>Memorize it, then choose the matching color from the options</li>
-                <li>You can pick close matches, but you&apos;re limited to 3 in early levels</li>
-                <li>Be quick and accurate to score high!</li>
-              </ul>
-            </div>
-            <div className="space-y-2">
-              <Button 
-                onClick={startGame} 
-                size="lg" 
-                className="w-full sm:w-auto text-base sm:text-lg px-6 py-3 sm:px-8 sm:py-4 md:text-xl md:px-12 md:py-6 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700"
-              >
-                Start Game
-              </Button>
-            </div>
-          </div>
+          <GameIntro startGame={startGame} />
         )}
         
         {gameState.isPlaying && (
           <div className="space-y-2 sm:space-y-4">
             <React.Suspense fallback={<Skeleton className="w-full h-12" />}>
-              <MemoizedScoreDisplay gameState={gameState} comboMultiplier={comboMultiplier} closeMatches={closeMatches} closeMatchLimit={gameState.level <= 50 ? 3 : 1} />
+              {memoizedScoreDisplay}
             </React.Suspense>
             <div className="flex justify-center my-8 sm:my-0">
               {showTarget ? (
@@ -519,11 +553,12 @@ export function ColorMemoryGame() {
                     key={`target-${gameState.targetColor}`}
                     color={gameState.targetColor} 
                     size="large"
+                    aria-label="Target color"
                   />
                 </React.Suspense>
               ) : (
-                <div className="grid grid-cols-3 gap-3 sm:gap-4 md:gap-6 lg:gap-8 justify-center max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg xl:max-w-xl mx-auto">
-                  {gameState.options.slice(0, Math.min(6, gameState.options.length)).map((color) => (
+                <div className="grid grid-cols-3 gap-3 sm:gap-4 md:gap-6 lg:gap-8 justify-center max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg xl:max-w-xl mx-auto" role="group" aria-label="Color options">
+                  {gameState.options.slice(0, Math.min(6, gameState.options.length)).map((color, index) => (
                     <React.Suspense key={color} fallback={<Skeleton className="w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 rounded-md" />}>
                       <MemoizedColorSwatch
                         color={color}
@@ -533,6 +568,7 @@ export function ColorMemoryGame() {
                             handleColorSelection(color)
                           }
                         }}
+                        aria-label={`Color option ${index + 1}`}
                       />
                     </React.Suspense>
                   ))}
@@ -542,6 +578,7 @@ export function ColorMemoryGame() {
             <Progress 
               value={(gameState.timeLeft / (showTarget ? calculateDifficulty(gameState.level).viewTime : calculateDifficulty(gameState.level).selectionTime)) * 100} 
               className="h-2 sm:h-3 md:h-4 w-full"
+              aria-label="Time remaining"
             />
           </div>
         )}
@@ -559,14 +596,9 @@ export function ColorMemoryGame() {
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <p className="text-2xl font-bold text-center">
-              Your Score: {gameState.score}
+              {isNewHighScore ? "New High Score: " : "Your Score: "}{gameState.score}
             </p>
             <p className="text-xl text-center">Level Reached: {gameState.level}</p>
-            {isNewHighScore && (
-              <p className="text-lg text-center text-green-600">
-                New High Score: {gameState.score}
-              </p>
-            )}
             {showUsernameInput && (
               <div>
                 <p className="text-sm text-gray-600 mb-2">Enter a username to save your score:</p>

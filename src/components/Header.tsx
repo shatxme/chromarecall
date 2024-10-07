@@ -6,10 +6,15 @@ import { Button } from "@/components/ui/button"
 import { Crown } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import dynamic from 'next/dynamic'
+import type { LocalUserData } from "../types"
 
 const Leaderboard = dynamic(() => import('./Leaderboard').then(mod => mod.Leaderboard))
 
-export default function AnimatedHeader() {
+interface HeaderProps {
+  localUserData: LocalUserData | null;
+}
+
+export default function Header({ localUserData }: HeaderProps) {
   const [showLeaderboard, setShowLeaderboard] = useState(false)
   const [isLeaderboardLoading, setIsLeaderboardLoading] = useState(true)
 
@@ -56,7 +61,7 @@ export default function AnimatedHeader() {
           </DialogHeader>
           <div className="py-4">
             <Leaderboard 
-              localUserData={null} 
+              localUserData={localUserData}  // Pass the actual localUserData here
               isLoading={isLeaderboardLoading}
               setIsLoading={setIsLeaderboardLoading}
             />

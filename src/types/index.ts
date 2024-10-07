@@ -6,6 +6,7 @@ export interface GameState {
   timeLeft: number
   isPlaying: boolean
   highScore: number
+  closeMatches: number // Add this line
 }
 
 // Add any other types you might need for the game
