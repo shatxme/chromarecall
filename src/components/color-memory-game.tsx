@@ -557,7 +557,11 @@ export function ColorMemoryGame() {
                   />
                 </React.Suspense>
               ) : (
-                <div className="grid grid-cols-3 gap-3 sm:gap-4 md:gap-6 lg:gap-8 justify-center max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg xl:max-w-xl mx-auto" role="group" aria-label="Color options">
+                <div 
+                  className="grid grid-cols-3 gap-3 sm:gap-4 md:gap-6 lg:gap-8 justify-center max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg xl:max-w-xl mx-auto" 
+                  role="group" 
+                  aria-label="Color options"
+                >
                   {gameState.options.slice(0, Math.min(6, gameState.options.length)).map((color, index) => (
                     <React.Suspense key={color} fallback={<Skeleton className="w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 rounded-md" />}>
                       <MemoizedColorSwatch
