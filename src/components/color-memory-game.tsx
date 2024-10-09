@@ -19,6 +19,8 @@ import { generateGameColors, calculateColorDifference, calculateDifficulty } fro
 import { Skeleton } from "@/components/ui/skeleton"
 import { saveScore } from '../lib/api';
 import GameIntro from './GameIntro'
+import Confetti from 'react-confetti'
+import useColorSelection from '../hooks/useColorSelection';
 
 const ColorSwatch = dynamic(() => import('./color-swatch'), {
   loading: () => <Skeleton className="w-24 h-24 sm:w-32 sm:h-32 md:w-40 md:h-40 rounded-md" />
@@ -39,76 +41,6 @@ const AttractiveButton: React.FC<React.ButtonHTMLAttributes<HTMLButtonElement>> 
 
 // Utility functions
 const getCloseMatchLimit = (level: number) => level <= 50 ? 3 : 1;
-
-const formatCombo = (combo: number) => combo.toFixed(1);
-
-// Add this type definition if not already present
-type ColorSelectionResult = {
-  gameOver: boolean;
-  feedbackMessage: string;
-  isExactMatch: boolean;
-  totalPoints: number;
-  accuracyPoints: number;
-  speedPoints: number;
-};
-
-// Custom hook for color selection logic
-function useColorSelection(
-  handleColorSelect: (selectedColor: string) => Promise<ColorSelectionResult | null>,
-  comboMultiplier: number,
-  memoizedToast: (props: { title: string; description: string }) => void,
-  handleGameEnd: (lost: boolean) => void,
-  gameState: GameState,
-  isProcessingSelection: boolean,
-  setIsProcessingSelection: (value: boolean) => void
-) {
-  const [feedbackText, setFeedbackText] = useState("");
-  const [showFeedback, setShowFeedback] = useState(false);
-  const [exactMatch, setExactMatch] = useState(false);
-
-  const handleColorSelection = useCallback((selectedColor: string) => {
-    if (isProcessingSelection || !gameState.isPlaying) {
-      return;
-    }
-
-    setIsProcessingSelection(true);
-
-    handleColorSelect(selectedColor)
-      .then((result: ColorSelectionResult | null) => {
-        if (result) {
-          const { gameOver, feedbackMessage, isExactMatch, totalPoints, accuracyPoints, speedPoints } = result;
-          setExactMatch(isExactMatch);
-          setFeedbackText(feedbackMessage);
-          setShowFeedback(true);
-          
-          setTimeout(() => setShowFeedback(false), 1000);
-
-          memoizedToast({
-            title: "Color Selected!",
-            description: `You earned ${totalPoints} points! (Accuracy: ${accuracyPoints}, Speed: ${speedPoints}${comboMultiplier > 1 ? `, Combo: ${formatCombo(comboMultiplier)}x` : ''})`,
-          });
-
-          if (gameOver) {
-            handleGameEnd(true);
-          }
-        }
-      })
-      .catch((error: Error) => {
-        console.error("Error during color selection:", error);
-        handleGameEnd(true);
-      })
-      .finally(() => {
-        setIsProcessingSelection(false);
-      });
-  }, [handleColorSelect, comboMultiplier, memoizedToast, handleGameEnd, gameState.isPlaying, isProcessingSelection, setIsProcessingSelection]);
-
-  return {
-    feedbackText,
-    showFeedback,
-    exactMatch,
-    handleColorSelection
-  };
-}
 
 function useGameLogic(
   setIsProcessingSelection: (value: boolean) => void,
@@ -165,16 +97,7 @@ function useGameLogic(
   const generateColors = useCallback((level: number): { target: string, options: string[] } => {
     const result = generateGameColors(level);
     console.log(`Target color generated for level ${level}: ${result.target}`);
-    
-    const colorDescriptions = result.options.map(color => {
-      if (color === result.target) return `${color} (target color)`;
-      const difference = calculateColorDifference(result.target, color);
-      if (difference < 15) return `${color} (similar color)`;
-      return `${color} (wrong color)`;
-    });
-    
-    console.log(`Color options generated for level ${level}: ${colorDescriptions.join(', ')}`);
-    
+    console.log(`Color options generated for level ${level}: ${result.options.join(', ')}`);
     return result;
   }, []);
 
@@ -268,19 +191,15 @@ function useGameLogic(
     const timeBonus = Math.max(0, gameState.timeLeft / selectionTime);
     
     const isExactMatch = difference < 1;
-    const isCloseMatch = difference < 25 * (1 - similarity); // Increased threshold from 15 to 25
+    const isBossLevel = gameState.level % 10 === 0;
+    const isCloseMatch = !isBossLevel && difference < 25 * (1 - similarity);
     
     let newCloseMatches = gameState.closeMatches;
     let newComboMultiplier = comboMultiplier;
     let gameOver = false;
     let feedbackMessage = "";
 
-    const closeMatchLimit = getCloseMatchLimit(gameState.level);
-
-    // Reset close matches every 10 levels
-    if (gameState.level % 10 === 0) {
-      newCloseMatches = 0;
-    }
+    const closeMatchLimit = 3; // Constant for all non-boss levels
 
     if (isExactMatch) {
       newComboMultiplier = Math.min(5, comboMultiplier + 0.5);
@@ -288,14 +207,14 @@ function useGameLogic(
     } else if (isCloseMatch) {
       newCloseMatches++;
       newComboMultiplier = 1;
-      feedbackMessage = "Close enough!";
+      feedbackMessage = "Close match!";
       if (newCloseMatches > closeMatchLimit) {
         gameOver = true;
-        feedbackMessage = "Out of close matches!";
+        feedbackMessage = "";
       }
     } else {
       gameOver = true;
-      feedbackMessage = "Wrong color!";
+      feedbackMessage = ""; // Remove the "Wrong color!" feedback
     }
 
     const accuracyPoints = Math.max(0, 100 - Math.round(difference * 1000));
@@ -319,7 +238,7 @@ function useGameLogic(
           targetColor: newColors.target,
           options: newColors.options,
           timeLeft: 3,
-          closeMatches: newCloseMatches
+          closeMatches: (prevState.level + 1) % 10 === 1 ? 0 : newCloseMatches // Reset close matches at the start of each 10-level cycle
         };
         console.log(`Updated game state:`, updatedState);
         return updatedState;
@@ -385,6 +304,8 @@ export function ColorMemoryGame() {
   const [showLossDialog, setShowLossDialog] = useState(false)
   const [isNewHighScore, setIsNewHighScore] = useState(false)
   const [isProcessingSelection, setIsProcessingSelection] = useState(false)
+  const [showConfetti, setShowConfetti] = useState(false);
+  const confettiTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const memoizedToast = useCallback(toast, [])
 
@@ -451,12 +372,45 @@ export function ColorMemoryGame() {
     setShowLossDialog(true);
   }, [handleGameEndFromHook, gameState.score, gameState.level, localUserData, updateUserData, memoizedToast, setIsNewHighScore, setShowUsernameInput]);
 
+  const handleConfetti = useCallback(() => {
+    setShowConfetti(true);
+    
+    // Clear any existing timeout
+    if (confettiTimeoutRef.current) {
+      clearTimeout(confettiTimeoutRef.current);
+    }
+    
+    // Set a new timeout to hide confetti after 1 second
+    confettiTimeoutRef.current = setTimeout(() => {
+      setShowConfetti(false);
+    }, 1000);
+  }, []);
+
   const {
     feedbackText,
     showFeedback,
-    exactMatch,
-    handleColorSelection
-  } = useColorSelection(handleColorSelect, comboMultiplier, memoizedToast, handleGameEnd, gameState, isProcessingSelection, setIsProcessingSelection);
+    handleColorSelection,
+    setChromatisChallengeMode,
+    feedbackColor
+  } = useColorSelection(
+    handleColorSelect,
+    comboMultiplier,
+    memoizedToast,
+    handleGameEnd,
+    gameState,
+    isProcessingSelection,
+    setIsProcessingSelection,
+    handleConfetti // Pass the confetti handler
+  );
+
+  // Use useEffect to set Chromatic Challenge mode
+  useEffect(() => {
+    if (gameState.level % 10 === 0) {
+      setChromatisChallengeMode(true);
+    } else {
+      setChromatisChallengeMode(false);
+    }
+  }, [gameState.level, setChromatisChallengeMode]);
 
   useEffect(() => {
     const storedData = localStorage.getItem('userData')
@@ -516,8 +470,25 @@ export function ColorMemoryGame() {
     />
   ), [gameState, comboMultiplier]);
 
+  // Cleanup effect for confetti timeout
+  useEffect(() => {
+    return () => {
+      if (confettiTimeoutRef.current) {
+        clearTimeout(confettiTimeoutRef.current);
+      }
+    };
+  }, []);
+
   return (
     <div className="p-2 sm:p-4 pb-4 sm:pb-6 relative" role="main" aria-label="Color Memory Game">
+      {showConfetti && (
+        <Confetti
+          recycle={false}
+          numberOfPieces={200}
+          gravity={0.5} // Increase gravity to make confetti fall faster
+          tweenDuration={100} // Reduce tween duration for quicker animation
+        />
+      )}
       <div className="absolute top-2 sm:top-4 left-2 sm:left-4 right-2 sm:right-4 flex justify-center items-center">
         <AnimatePresence mode="wait">
           {showFeedback && (
@@ -526,8 +497,14 @@ export function ColorMemoryGame() {
               initial={{ opacity: 0, y: -20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 20 }}
-              transition={{ duration: 0.3 }}
-              className={`text-lg sm:text-xl md:text-2xl font-bold text-center ${exactMatch ? 'text-green-500' : 'text-yellow-500'}`}
+              transition={{ duration: 0.2 }}
+              className={`text-lg sm:text-xl md:text-2xl font-bold text-center ${
+                feedbackColor === 'green'
+                  ? 'text-green-500'
+                  : feedbackColor === 'purple'
+                    ? 'text-purple-600'
+                    : 'text-yellow-500'
+              }`}
               aria-live="polite"
             >
               {feedbackText}
@@ -546,6 +523,7 @@ export function ColorMemoryGame() {
             <React.Suspense fallback={<Skeleton className="w-full h-12" />}>
               {memoizedScoreDisplay}
             </React.Suspense>
+            
             <div className="flex justify-center my-8 sm:my-0">
               {showTarget ? (
                 <React.Suspense fallback={<Skeleton className="w-24 h-24 sm:w-32 sm:h-32 md:w-40 md:h-40 rounded-md" />}>
@@ -558,20 +536,21 @@ export function ColorMemoryGame() {
                 </React.Suspense>
               ) : (
                 <div 
-                  className="grid grid-cols-3 gap-3 sm:gap-4 md:gap-6 lg:gap-8 justify-center max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg xl:max-w-xl mx-auto" 
+                  className={`grid gap-3 sm:gap-4 md:gap-6 lg:gap-8 justify-center max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg xl:max-w-xl mx-auto ${
+                    gameState.options.length === 2 ? 'grid-cols-2' : 
+                    gameState.options.length === 3 ? 'grid-cols-3' : 
+                    gameState.options.length === 4 ? 'grid-cols-2' : 
+                    'grid-cols-3'
+                  }`}
                   role="group" 
                   aria-label="Color options"
                 >
-                  {gameState.options.slice(0, Math.min(6, gameState.options.length)).map((color, index) => (
+                  {gameState.options.map((color, index) => (
                     <React.Suspense key={color} fallback={<Skeleton className="w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 rounded-md" />}>
                       <MemoizedColorSwatch
                         color={color}
                         size="medium"
-                        onClick={() => {
-                          if (!isProcessingSelection && gameState.isPlaying) {
-                            handleColorSelection(color)
-                          }
-                        }}
+                        onClick={() => handleColorSelection(color)} // Use the handleColorSelection from the hook
                         aria-label={`Color option ${index + 1}`}
                       />
                     </React.Suspense>

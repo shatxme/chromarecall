@@ -16,6 +16,15 @@ export interface LocalUserData {
   highestScore: number;
 }
 
+export interface ColorSelectionResult {
+  gameOver: boolean;
+  feedbackMessage: string;
+  isExactMatch: boolean;
+  totalPoints: number;
+  accuracyPoints: number;
+  speedPoints: number;
+}
+
 export type LeaderboardEntry = {
   username: string
   score: number

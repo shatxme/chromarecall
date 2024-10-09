@@ -92,44 +92,13 @@ export function generateColors(colorCount: number, similarity: number): { target
 
   const options = new Set([target]);
   
-  const colorDifferenceThreshold = (1 - similarity) * 0.2; // Increase threshold
-  const decoyThreshold = colorDifferenceThreshold * 0.7; // Increase decoy threshold
-  const maxAttempts = 1000;
-  
-  // Generate a decoy color
-  let decoy;
-  do {
-    decoy = generateSimilarColor(target, similarity * 0.9); // Make decoy slightly more different
-  } while (calculateColorDifference(target, decoy) < decoyThreshold || !isContrastSufficient(decoy) || options.has(decoy));
-  options.add(decoy);
-  
-  // Generate other colors
   while (options.size < colorCount) {
     let option;
-    let attempts = 0;
     do {
       option = generateSimilarColor(target, similarity);
-      attempts++;
-    } while ((calculateColorDifference(target, option) < colorDifferenceThreshold || !isContrastSufficient(option) || options.has(option)) && attempts < maxAttempts);
+    } while (!isContrastSufficient(option) || options.has(option));
     
-    if (attempts < maxAttempts) {
-      options.add(option);
-    }
-  }
-  
-  // Ensure at least one noticeably different color
-  if (colorCount > 3) {
-    let distinctColor;
-    do {
-      distinctColor = generateDistinctColor(target, similarity * 0.8); // Make distinct color more different
-    } while (!isContrastSufficient(distinctColor) || options.has(distinctColor));
-    
-    // Remove one of the existing colors, ensuring we don't remove the target
-    const colorToRemove = Array.from(options).find(color => color !== target);
-    if (colorToRemove) {
-      options.delete(colorToRemove);
-    }
-    options.add(distinctColor);
+    options.add(option);
   }
   
   return { target, options: shuffleArray(Array.from(options)) };
@@ -137,30 +106,15 @@ export function generateColors(colorCount: number, similarity: number): { target
 
 function generateSimilarColor(baseColor: string, similarity: number): string {
   const [h, s, l] = hex2hsl(baseColor);
-  const hueRange = 360 * (1 - similarity) * 0.7; // Increase hue range
-  const saturationRange = 30 * (1 - similarity); // Increase saturation range
-  const lightnessRange = 20 * (1 - similarity); // Increase lightness range
+  const hueRange = 360 * (1 - similarity);
+  const saturationRange = 30 * (1 - similarity);
+  const lightnessRange = 20 * (1 - similarity);
 
   const newHue = (h + (Math.random() * 2 - 1) * hueRange + 360) % 360;
   const newSaturation = Math.max(20, Math.min(100, s + (Math.random() * 2 - 1) * saturationRange));
   const newLightness = Math.max(20, Math.min(80, l + (Math.random() * 2 - 1) * lightnessRange));
 
   return hslToHex(newHue, newSaturation, newLightness);
-}
-
-function generateDistinctColor(baseColor: string, similarity: number): string {
-  const [h, s, l] = hex2hsl(baseColor);
-  const hueShift = 180 + (Math.random() - 0.5) * 60; // Opposite hue with some variation
-  const newHue = (h + hueShift) % 360;
-  const newSaturation = Math.max(30, Math.min(100, s + (Math.random() - 0.5) * 40));
-  const newLightness = Math.max(20, Math.min(80, l + (Math.random() - 0.5) * 40));
-  
-  // Use similarity to adjust the distinctness
-  const adjustedHue = (newHue + (1 - similarity) * 90) % 360; // Reduce hue adjustment
-  const adjustedSaturation = Math.max(30, Math.min(100, newSaturation + (1 - similarity) * 30));
-  const adjustedLightness = Math.max(20, Math.min(80, newLightness + (1 - similarity) * 30));
-  
-  return hslToHex(adjustedHue, adjustedSaturation, adjustedLightness);
 }
 
 function rgbToLab(r: number, g: number, b: number): [number, number, number] {
@@ -239,18 +193,23 @@ function shuffleArray<T>(array: T[]): T[] {
   return array;
 }
 
-export function calculateTimeForLevel(level: number): number {
-  // Start with 5 seconds, decrease by 1 second every 10 levels, minimum 1 second
-  return Math.max(1, 5 - Math.floor(level / 10));
-}
-
-// Update the calculateDifficulty function
 export function calculateDifficulty(level: number) {
-  const colorCount = Math.min(6, 3 + Math.floor(level / 15));
-  const similarity = Math.min(0.95, 0.5 + Math.log10(level + 1) * 0.1);
+  const cycleLevel = (level - 1) % 10 + 1;
+  let colorCount: number;
+  let similarity: number;
   const viewTime = 3;
   
-  // New selection time calculation
+  if (cycleLevel >= 1 && cycleLevel <= 7) {
+    colorCount = 6;
+    similarity = 0.6;
+  } else if (cycleLevel >= 8 && cycleLevel <= 9) {
+    colorCount = 4;
+    similarity = 0.8;
+  } else {
+    colorCount = 2;
+    similarity = 0.98;
+  }
+
   const selectionTime = Math.max(5, 15 - Math.floor((level - 1) / 5));
 
   return { colorCount, similarity, viewTime, selectionTime };
@@ -262,28 +221,7 @@ function isContrastSufficient(color: string): boolean {
   return l >= 25 && l <= 75;
 }
 
-// Add these new functions to color-utils.ts
-
-function generateRandomHslColor(): [number, number, number] {
-  const h = Math.random() * 360;
-  const s = Math.random() * 40 + 60; // 60-100%
-  const l = Math.random() * 30 + 35; // 35-65%
-  return [h, s, l];
-}
-
 export function generateGameColors(level: number): { target: string, options: string[] } {
-  const { colorCount } = calculateDifficulty(level);
-  const targetHsl = generateRandomHslColor();
-  const target = hslToHex(...targetHsl);
-  const options: string[] = [target];
-
-  while (options.length < colorCount) {
-    const newColorHsl = generateRandomHslColor();
-    const newColor = hslToHex(...newColorHsl);
-    if (!options.includes(newColor)) {
-      options.push(newColor);
-    }
-  }
-
-  return { target, options: shuffleArray(options) };
+  const { colorCount, similarity } = calculateDifficulty(level);
+  return generateColors(colorCount, similarity);
 }

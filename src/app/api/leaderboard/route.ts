@@ -65,20 +65,24 @@ async function fetchLeaderboard(collection: Collection<Document>): Promise<Leade
   return leaderboardData as LeaderboardEntry[];
 }
 
-async function isScoreInTop10(collection: Collection<Document>, score: number): Promise<boolean> {
-  const topScores = await collection
-    .find()
-    .sort({ score: -1 })
-    .limit(10)
-    .toArray();
+// The isScoreInTop10 function is currently not used in this file.
+// It was likely implemented for future use or as part of a feature that hasn't been fully integrated yet.
+// We'll keep it commented out for now, in case it's needed in the future.
 
-  if (topScores.length < 10) {
-    return true; // If we have less than 10 scores, any new score is in the top 10
-  }
+// async function isScoreInTop10(collection: Collection<Document>, score: number): Promise<boolean> {
+//   const topScores = await collection
+//     .find()
+//     .sort({ score: -1 })
+//     .limit(10)
+//     .toArray();
 
-  const lowestTopScore = topScores[topScores.length - 1].score;
-  return score > lowestTopScore;
-}
+//   if (topScores.length < 10) {
+//     return true; // If we have less than 10 scores, any new score is in the top 10
+//   }
+
+//   const lowestTopScore = topScores[topScores.length - 1].score;
+//   return score > lowestTopScore;
+// }
 
 export async function POST(request: NextRequest) {
   try {
