@@ -1,5 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
-import { ColorSelectionResult, GameState } from '@/types';
+import { ColorSelectionResult, GameState, LocalUserData } from '@/types';
+import { awardCoins } from '@/lib/api';
+import { calculateDifficulty } from '@/lib/color-utils';
 
 function useColorSelection(
   handleColorSelect: (selectedColor: string) => Promise<ColorSelectionResult | null>,
@@ -9,7 +11,9 @@ function useColorSelection(
   gameState: GameState,
   isProcessingSelection: boolean,
   setIsProcessingSelection: (value: boolean) => void,
-  showConfetti: () => void
+  showConfetti: () => void,
+  localUserData: LocalUserData | null,
+  updateUserData: (username: string, newScore: number, newCoins?: number) => void
 ) {
   const [feedbackText, setFeedbackText] = useState("");
   const [showFeedback, setShowFeedback] = useState(false);
@@ -36,48 +40,67 @@ function useColorSelection(
     }
   }, [gameState.level, setChromatisChallengeMode]);
 
-  const handleColorSelection = useCallback((selectedColor: string) => {
+  const handleColorSelection = useCallback(async (selectedColor: string) => {
     if (isProcessingSelection || !gameState.isPlaying) {
       return;
     }
 
     setIsProcessingSelection(true);
 
-    handleColorSelect(selectedColor)
-      .then((result: ColorSelectionResult | null) => {
-        if (result) {
-          const { gameOver, feedbackMessage, isExactMatch, totalPoints, accuracyPoints, speedPoints } = result;
-          setExactMatch(isExactMatch);
-          
-          if (!gameOver) {
-            setFeedbackText(feedbackMessage);
-            setFeedbackColor(isExactMatch ? 'green' : isChromatisChallengeMode ? 'purple' : 'yellow');
-            setShowFeedback(true);
-            setTimeout(() => setShowFeedback(false), 800);
+    try {
+      const result = await handleColorSelect(selectedColor);
+      if (result) {
+        const { gameOver, feedbackMessage, isExactMatch, totalPoints, accuracyPoints, speedPoints } = result;
+        setExactMatch(isExactMatch);
+        
+        if (!gameOver) {
+          setFeedbackText(feedbackMessage);
+          setFeedbackColor(isExactMatch ? 'green' : isChromatisChallengeMode ? 'purple' : 'yellow');
+          setShowFeedback(true);
+          setTimeout(() => setShowFeedback(false), 800);
 
-            memoizedToast({
-              title: "Color Selected!",
-              description: `You earned ${totalPoints} points! (Accuracy: ${accuracyPoints}, Speed: ${speedPoints}${comboMultiplier > 1 ? `, Combo: ${comboMultiplier.toFixed(1)}x` : ''})`,
-            });
+          memoizedToast({
+            title: "Color Selected!",
+            description: `You earned ${totalPoints} points! (Accuracy: ${accuracyPoints}, Speed: ${speedPoints}${comboMultiplier > 1 ? `, Combo: ${comboMultiplier.toFixed(1)}x` : ''})`,
+          });
 
-            if (isChromatisChallengeMode && isExactMatch) {
-              showConfetti();
+          if (isChromatisChallengeMode && isExactMatch) {
+            showConfetti();
+            
+            // Award coins for completing Chromatic Challenge
+            if (localUserData?.username) {
+              try {
+                const selectionTime = calculateDifficulty(gameState.level).selectionTime;
+                console.log('Calling awardCoins with:', localUserData.username, gameState.timeLeft, selectionTime);
+                const awardedCoins = await awardCoins(localUserData.username, gameState.timeLeft, selectionTime);
+                console.log('Coins awarded:', awardedCoins);
+                updateUserData(localUserData.username, gameState.score + totalPoints, awardedCoins);
+                memoizedToast({
+                  title: "Chromatic Challenge Completed!",
+                  description: `You've been awarded ${awardedCoins} coins!`,
+                });
+              } catch (error) {
+                console.error('Error awarding coins:', error);
+                memoizedToast({
+                  title: "Error",
+                  description: "Failed to award coins. Please try again.",
+                });
+              }
             }
           }
-
-          if (gameOver) {
-            handleGameEnd(true);
-          }
         }
-      })
-      .catch((error: Error) => {
-        console.error("Error during color selection:", error);
-        handleGameEnd(true);
-      })
-      .finally(() => {
-        setIsProcessingSelection(false);
-      });
-  }, [handleColorSelect, comboMultiplier, memoizedToast, handleGameEnd, gameState.isPlaying, isProcessingSelection, setIsProcessingSelection, isChromatisChallengeMode, showConfetti]);
+
+        if (gameOver) {
+          handleGameEnd(true);
+        }
+      }
+    } catch (error) {
+      console.error("Error during color selection:", error);
+      handleGameEnd(true);
+    } finally {
+      setIsProcessingSelection(false);
+    }
+  }, [handleColorSelect, comboMultiplier, memoizedToast, handleGameEnd, gameState, isProcessingSelection, setIsProcessingSelection, isChromatisChallengeMode, showConfetti, localUserData, updateUserData]);
 
   return {
     feedbackText,

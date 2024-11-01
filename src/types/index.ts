@@ -14,6 +14,7 @@ export interface GameState {
 export interface LocalUserData {
   username: string;
   highestScore: number;
+  coins: number;
 }
 
 export interface ColorSelectionResult {

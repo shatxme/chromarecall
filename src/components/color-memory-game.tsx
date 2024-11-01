@@ -17,7 +17,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import type { GameState, LocalUserData } from "../types"
 import { generateGameColors, calculateColorDifference, calculateDifficulty } from "../lib/color-utils"
 import { Skeleton } from "@/components/ui/skeleton"
-import { saveScore } from '../lib/api';
+import { saveScore, awardCoins } from '../lib/api';
 import GameIntro from './GameIntro'
 import Confetti from 'react-confetti'
 import useColorSelection from '../hooks/useColorSelection';
@@ -59,7 +59,7 @@ function useGameLogic(
     timeLeft: 3,
     isPlaying: false,
     highScore: 0,
-    closeMatches: 0 // Initialize closeMatches
+    closeMatches: 0
   })
   const [showTarget, setShowTarget] = useState(false)
   const [comboMultiplier, setComboMultiplier] = useState(1)
@@ -309,10 +309,11 @@ export function ColorMemoryGame() {
 
   const memoizedToast = useCallback(toast, [])
 
-  const updateUserData = useCallback((username: string, newScore: number) => {
+  const updateUserData = useCallback((username: string, newScore: number, newCoins = 0) => {
     const updatedUserData: LocalUserData = { 
       username, 
-      highestScore: Math.max(localUserData?.highestScore || 0, newScore) 
+      highestScore: Math.max(localUserData?.highestScore || 0, newScore),
+      coins: (localUserData?.coins || 0) + newCoins
     };
     localStorage.setItem('userData', JSON.stringify(updatedUserData));
     setLocalUserData(updatedUserData);
@@ -336,12 +337,37 @@ export function ColorMemoryGame() {
   )
 
   const handleGameEnd = useCallback(async (lost = false) => {
+    console.log('handleGameEnd called. Lost:', lost, 'Level:', gameState.level, 'Score:', gameState.score);
     await handleGameEndFromHook(lost);
     
     if (gameState.score > 0) {
       if (localUserData?.username) {
         const isNewHighScore = gameState.score > (localUserData.highestScore || 0);
-        updateUserData(localUserData.username, gameState.score);
+        
+        // Check if the player just completed a Chromatic Challenge (level 10, 20, 30, etc.)
+        if (gameState.level % 10 === 0 && !lost) {
+          console.log('Chromatic Challenge completed. Attempting to award coins.');
+          try {
+            const selectionTime = calculateDifficulty(gameState.level).selectionTime;
+            console.log('Calling awardCoins with:', localUserData.username, gameState.timeLeft, selectionTime);
+            const awardedCoins = await awardCoins(localUserData.username, gameState.timeLeft, selectionTime);
+            console.log('Coins awarded:', awardedCoins);
+            updateUserData(localUserData.username, gameState.score, awardedCoins);
+            memoizedToast({
+              title: "Chromatic Challenge Completed!",
+              description: `You've been awarded ${awardedCoins} coins!`,
+            });
+          } catch (error) {
+            console.error('Error awarding coins:', error);
+            memoizedToast({
+              title: "Error",
+              description: "Failed to award coins. Please try again.",
+            });
+          }
+        } else {
+          console.log('Updating user data without awarding coins.');
+          updateUserData(localUserData.username, gameState.score);
+        }
         
         if (isNewHighScore) {
           try {
@@ -370,7 +396,7 @@ export function ColorMemoryGame() {
     }
 
     setShowLossDialog(true);
-  }, [handleGameEndFromHook, gameState.score, gameState.level, localUserData, updateUserData, memoizedToast, setIsNewHighScore, setShowUsernameInput]);
+  }, [handleGameEndFromHook, gameState.score, gameState.level, gameState.timeLeft, localUserData, updateUserData, memoizedToast, setIsNewHighScore, setShowUsernameInput]);
 
   const handleConfetti = useCallback(() => {
     setShowConfetti(true);
@@ -400,7 +426,9 @@ export function ColorMemoryGame() {
     gameState,
     isProcessingSelection,
     setIsProcessingSelection,
-    handleConfetti // Pass the confetti handler
+    handleConfetti,
+    localUserData,  // Add this
+    updateUserData  // Add this
   );
 
   // Use useEffect to set Chromatic Challenge mode
